@@ -53,7 +53,7 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
     }
 
     if (nrow(current_level) > 0) {
-      final_results[[level_key]] <- st_cast(current_level, 'POLYGON')
+      final_results[[level_key]] <- current_level
     }
 
     # Add to accumulated mask
