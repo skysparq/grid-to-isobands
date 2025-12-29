@@ -1,16 +1,45 @@
 library(sf)
 library(dplyr)
+library(s2)
 
 only_polys <- function(geometry) {
   geometry %>%
     filter(st_geometry_type(.) %in% c("POLYGON", "MULTIPOLYGON"))
 }
 
+flip_large_polygons <- function(data, area_threshold = 2.5e14) {
+  for (i in 1:nrow(data)) {
+    geom <- st_geometry(data[i,])
+    area <- as.numeric(st_area(geom))
+    
+    if (area > area_threshold) {
+      # Use s2 to rebuild with correct orientation
+      st_geometry(data[i,]) <- geom %>%
+        s2::as_s2_geography() %>%
+        s2::s2_rebuild(s2_options(dimensions = "polygon")) %>%
+        st_as_sfc()
+    }
+  }
+  return(data)
+}
+
 process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   cat("Reading GeoJSON...\n")
   data <- st_read(input_path, quiet = TRUE)
+  
+  data <- flip_large_polygons(data)
 
   cat(sprintf("Read %d features\n", nrow(data)))
+
+  #cross_edge <- 
+  #  st_is_valid(data, reason = TRUE) |>
+  #  grepl(x = _, pattern = "edge .* crosses edge", ignore.case = TRUE)
+  
+  #st_geometry(data)[cross_edge] <-
+  #  st_geometry(data)[cross_edge] |>  
+  #  as_s2_geography(check = FALSE) |>
+  #  s2_union() |>
+  #  st_as_sfc() 
   
   simplified <- st_simplify(data, preserveTopology = TRUE, dTolerance = tolerance_meters)
   simplified <- only_polys(simplified)

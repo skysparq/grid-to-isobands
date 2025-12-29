@@ -2,6 +2,7 @@ package grid_to_isobands
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -26,9 +27,9 @@ type GridValues struct {
 	Lons   []float64
 }
 
-func IsobandsFromGrid(grid GridValues, floor, step float64, addlProps map[string]any) (*FeatureCollection, error) {
+func IsobandsFromGrid(grid GridValues, transform Transformer, floor, step float64, addlProps map[string]any) (*FeatureCollection, error) {
 	jobId := uuid.NewString()
-	grid = preprocessGrid(grid, floor, step)
+	grid = preprocessGrid(grid, transform, floor, step)
 	isogons := createIsogons(grid, floor, step)
 	isobands, err := toIsobands(isogons, jobId)
 	if err != nil {
@@ -38,7 +39,10 @@ func IsobandsFromGrid(grid GridValues, floor, step float64, addlProps map[string
 	return isobands, nil
 }
 
-func preprocessGrid(vals GridValues, floor, step float64) GridValues {
+func preprocessGrid(vals GridValues, transform Transformer, floor, step float64) GridValues {
+	vals.Values = transform(vals.Values, vals.SizeX)
+	vals.Lons = transform(vals.Lons, vals.SizeX)
+	vals.Lats = transform(vals.Lats, vals.SizeX)
 	sentinel := floor - (step * 10)
 	// replace invalid values with a value much lower than floor
 	for i, value := range vals.Values {
@@ -99,27 +103,23 @@ func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
 
 			if ring.Orientation() == orb.CW {
 				ring = ring.Clone()
+				ring.Reverse()
 				currentFills = append(currentFills, ring)
 			} else {
 				ring = ring.Clone()
+				ring.Reverse()
 				currentHoles = append(currentHoles, ring)
 			}
 		}
 
-		for _, fill := range currentFills {
-			poly := orb.Polygon{fill}
-			for _, hole := range currentHoles {
-				if planar.RingContains(fill, hole[0]) {
-					poly = append(poly, hole)
-				}
-			}
+		polys := buildPolygonHierarchy(currentFills, currentHoles)
+		for _, poly := range polys {
 			collection.AddPolygon(poly, map[string]any{
 				`levelIndex`: levelIndex,
 				`floor`:      levelFloor,
 				`ceiling`:    levelTop,
 			})
 		}
-
 		levelIndex++
 	}
 	return collection
@@ -324,4 +324,39 @@ func loadCollection(path string) (*FeatureCollection, error) {
 		return nil, fmt.Errorf("error loading collection: failed to decode isobands file: %w", err)
 	}
 	return collection, nil
+}
+
+func cmpCcwRingArea(a, b orb.Ring) int {
+	return cmp.Compare(planar.Area(a), planar.Area(b)) * -1
+}
+func cmpCwRingArea(a, b orb.Ring) int {
+	return cmp.Compare(planar.Area(a), planar.Area(b))
+}
+
+// buildPolygonHierarchy builds polygons with proper hole handling
+// by checking containment relationships at each level
+func buildPolygonHierarchy(fills, holes []orb.Ring) []orb.Polygon {
+	if len(fills) == 0 {
+		return nil
+	}
+
+	slices.SortFunc(fills, cmpCcwRingArea)
+	slices.SortFunc(holes, cmpCwRingArea)
+
+	polys := make([]orb.Polygon, 0, len(fills))
+	for _, fill := range fills {
+		poly := orb.Polygon{fill}
+		for holei := 0; holei < len(holes); holei++ {
+			hole := holes[holei]
+			if planar.PolygonContains(poly, hole[0]) || planar.PolygonContains(poly, hole[len(hole)/2]) {
+				copyHole := make([]orb.Point, len(hole))
+				copy(copyHole, hole)
+				poly = append(poly, copyHole)
+				holes = slices.Delete(holes, holei, holei+1)
+				holei--
+			}
+		}
+		polys = append(polys, poly)
+	}
+	return polys
 }
