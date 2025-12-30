@@ -1,4 +1,4 @@
-module grid-to-isobands
+module github.com/skysparq/grid-to-isobands
 
 go 1.25
 
