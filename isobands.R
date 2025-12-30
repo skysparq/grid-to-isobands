@@ -56,7 +56,7 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
         inter <- st_intersects(combined_geom, hole_geom, sparse = FALSE)
         if (any(inter)) {
           tryCatch({
-            combined_geom <- st_difference(combined_geom, hole_geom)
+            combined_geom <- st_difference(combined_geom, hole_geom, dimension='polygon')
             combined_geom <- st_make_valid(combined_geom)
           }, error = function(e) {
             cat(sprintf("Warning: Error differencing hole: %s\n", e$message))

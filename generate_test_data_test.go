@@ -19,7 +19,7 @@ type TestData struct {
 	Lats, Lngs, Values []float64
 }
 
-func TestGenerateTestData(t *testing.T) {
+func TestGenerateBaseReflectivity(t *testing.T) {
 	t.Skip()
 	err := generateTestData(
 		"https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MergedBaseReflectivityQC_00.50/20251211/MRMS_MergedBaseReflectivityQC_00.50_20251211-235917.grib2.gz",
@@ -29,10 +29,26 @@ func TestGenerateTestData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = generateTestData(
+}
+
+func TestGenerateBaroPressureMsl(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
 		"https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20251002/12/atmos/gfs.t12z.pgrb2.0p25.f022",
 		"gfs-baro-pressure-msl.json",
 		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerateSurfaceTemp(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
+		"https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20251002/12/atmos/gfs.t12z.pgrb2.0p25.f022",
+		"temperature-surface.json",
+		581,
 	)
 	if err != nil {
 		t.Fatal(err)
