@@ -309,9 +309,8 @@ func execCmd(name string, args ...string) error {
 	cmd.Stdout = stdOut
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("error executing %v: %w: %v", name, err, stdErr.String())
+		return fmt.Errorf("error executing %v: %w: %v\nstdout: %v", name, err, stdErr.String(), stdOut.String())
 	}
-	print(stdOut.String())
 	return nil
 }
 

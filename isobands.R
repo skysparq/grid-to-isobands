@@ -9,24 +9,20 @@ only_polys <- function(geometry) {
 
 process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   options(s2_oriented = TRUE)
-  cat("Reading GeoJSON...\n")
   sf_use_s2(TRUE)
   data <- st_read(input_path, quiet = TRUE)
   data <- st_make_valid(data)
-  cat(sprintf("Read %d features\n", nrow(data)))
-  
+
   simplified <- st_simplify(data, preserveTopology = TRUE, dTolerance = tolerance_meters)
   simplified <- only_polys(simplified)
   
   # Group by quadrant
   quadrants <- unique(simplified$quadrant)
   quadrants <- sort(quadrants)
-  cat(sprintf("Processing %d quadrants\n", length(quadrants)))
-  
+
   final_results <- list()
   
   for (q in quadrants) {
-    cat(sprintf("Processing quadrant %d...\n", q))
     quad_data <- simplified %>% filter(quadrant == q)
     
     # Group by level
@@ -63,7 +59,7 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
             combined_geom <- st_difference(combined_geom, hole_geom)
             combined_geom <- st_make_valid(combined_geom)
           }, error = function(e) {
-            cat(sprintf("        Warning: Error differencing hole: %s\n", e$message))
+            cat(sprintf("Warning: Error differencing hole: %s\n", e$message))
           })
         }
       }
@@ -79,7 +75,6 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
     }
     
     # Punch holes between levels (higher levels punch into lower)
-    cat("Punching holes between levels in quadrant...\n")
     final_results_q <- list()
     accumulated_mask <- NULL
     
@@ -135,12 +130,7 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   # Combine results
   if (length(final_results) > 0) {
     all_features <- do.call(rbind, final_results)
-    
-    cat(sprintf("Complete: %d features\n", nrow(all_features)))
-    
     st_write(all_features, output_path, delete_dsn = TRUE, quiet = TRUE)
-    
-    cat(sprintf("Wrote output to %s\n", output_path))
   } else {
     cat("No valid features to write\n")
   }
