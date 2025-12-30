@@ -15,8 +15,6 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   data <- st_make_valid(data)
   cat(sprintf("Read %d features\n", nrow(data)))
   
-  #sf_use_s2(TRUE)
-  
   simplified <- st_simplify(data, preserveTopology = TRUE, dTolerance = tolerance_meters)
   simplified <- only_polys(simplified)
   
@@ -95,14 +93,9 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
       
       # Erase accumulated mask from current level
       if (!is.null(accumulated_mask)) {
-        #tryCatch({
-        
         current_level <- st_difference(current_level, accumulated_mask, dimension='polygon')
         current_level <- st_make_valid(current_level)
         current_level <- only_polys(current_level)
-        #}, error = function(e) {
-        #  cat(sprintf("  Warning: Error punching level %d: %s\n", level_idx, e$message))
-        #})
       }
       
       # Remove empty geometries

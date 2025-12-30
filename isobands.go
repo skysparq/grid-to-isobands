@@ -2,7 +2,6 @@ package grid_to_isobands
 
 import (
 	"bytes"
-	"cmp"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/clip"
-	"github.com/paulmach/orb/planar"
 )
 
 const levelEpsilon = 1e-5
@@ -32,11 +30,26 @@ type GridValues struct {
 	Lons   []float64
 }
 
-func IsobandsFromGrid(grid GridValues, transform Transformer, floor, step float64, addlProps map[string]any) (*FeatureCollection, error) {
+type IsobandArgs struct {
+	Grid        GridValues
+	Transform   Transformer
+	Floor, Step float64
+	AddlProps   map[string]any
+	WorkDir     string
+}
+
+func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
+	grid, transform, floor, step := args.Grid, args.Transform, args.Floor, args.Step
+	addlProps := args.AddlProps
+	workDir := args.WorkDir
+	if workDir == "" {
+		workDir = `./tmp`
+	}
+
 	jobId := uuid.NewString()
 	grid = preprocessGrid(grid, transform, floor, step)
 	isogons := createIsogons(grid, floor, step)
-	isobands, err := toIsobands(isogons, jobId)
+	isobands, err := toIsobands(isogons, jobId, workDir)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
@@ -145,9 +158,9 @@ func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
 	return collection
 }
 
-func toIsobands(isogons *FeatureCollection, jobId string) (*FeatureCollection, error) {
-	inPath := densePath(jobId)
-	outPath := simplePath(jobId)
+func toIsobands(isogons *FeatureCollection, jobId string, workDir string) (*FeatureCollection, error) {
+	inPath := densePath(jobId, workDir)
+	outPath := simplePath(jobId, workDir)
 	in, err := os.Create(inPath)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to create input file: %w", err)
@@ -302,85 +315,21 @@ func execCmd(name string, args ...string) error {
 	return nil
 }
 
-func densePath(jobId string) string {
-	return tmpFilePath(jobId + `-dense.geojson`)
+func densePath(jobId, workDir string) string {
+	return tmpFilePath(jobId+`-dense.geojson`, workDir)
 }
 
-func simplePath(jobId string) string {
-	return tmpFilePath(jobId + `-simple.geojson`)
+func simplePath(jobId, workDir string) string {
+	return tmpFilePath(jobId+`-simple.geojson`, workDir)
 }
 
-func tmpFilePath(filename string) string {
-	path := filepath.Join(`./tmp`, filename)
+func tmpFilePath(filename, workDir string) string {
+	path := filepath.Join(workDir, filename)
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return path
 	}
 	return absPath
-}
-
-func saveCollection(isogons *FeatureCollection, path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("error saving collection: failed to create isobands file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	encoder := json.NewEncoder(f)
-	err = encoder.Encode(isogons)
-	if err != nil {
-		return fmt.Errorf("error saving collection: failed to encode isobands file: %w", err)
-	}
-	return nil
-}
-
-func loadCollection(path string) (*FeatureCollection, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("error loading collection: failed to open isobands file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	decoder := json.NewDecoder(f)
-	collection := &FeatureCollection{}
-	err = decoder.Decode(collection)
-	if err != nil {
-		return nil, fmt.Errorf("error loading collection: failed to decode isobands file: %w", err)
-	}
-	return collection, nil
-}
-
-func cmpCcwRingArea(a, b orb.Ring) int {
-	return cmp.Compare(planar.Area(a), planar.Area(b)) * -1
-}
-func cmpCwRingArea(a, b orb.Ring) int {
-	return cmp.Compare(planar.Area(a), planar.Area(b))
-}
-
-// buildPolygonHierarchy builds polygons with proper hole handling
-// by checking containment relationships at each level
-func buildPolygonHierarchy(fills, holes []orb.Ring) []orb.Polygon {
-	if len(fills) == 0 {
-		return nil
-	}
-
-	slices.SortFunc(fills, cmpCcwRingArea)
-	slices.SortFunc(holes, cmpCwRingArea)
-
-	polys := make([]orb.Polygon, 0, len(fills))
-	for _, fill := range fills {
-		poly := orb.Polygon{fill}
-		for holei := 0; holei < len(holes); holei++ {
-			hole := holes[holei]
-			if planar.PolygonContains(poly, hole[0]) || planar.PolygonContains(poly, hole[len(hole)/2]) {
-				copyHole := make([]orb.Point, len(hole))
-				copy(copyHole, hole)
-				poly = append(poly, copyHole)
-				holes = slices.Delete(holes, holei, holei+1)
-				holei--
-			}
-		}
-		polys = append(polys, poly)
-	}
-	return polys
 }
 
 func splitToQuadrants(polys []orb.Polygon) []Feature {
