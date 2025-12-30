@@ -1,9 +1,10 @@
 package grid_to_isobands_test
 
 import (
-	"grid-to-isobands"
 	"slices"
 	"testing"
+
+	"github.com/skysparq/grid-to-isobands"
 )
 
 func TestSwapEvenSizedRows(t *testing.T) {

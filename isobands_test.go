@@ -3,11 +3,12 @@ package grid_to_isobands_test
 import (
 	"encoding/json"
 	"fmt"
-	"grid-to-isobands"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/skysparq/grid-to-isobands"
 )
 
 func TestMrmsBaseReflectivity(t *testing.T) {
