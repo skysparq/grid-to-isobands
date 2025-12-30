@@ -3,6 +3,7 @@ package grid_to_isobands
 import (
 	"bytes"
 	"cmp"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -19,6 +20,9 @@ import (
 )
 
 const levelEpsilon = 1e-5
+
+//go:embed isobands.R
+var rScript []byte // Embed the R script as bytes
 
 type GridValues struct {
 	SizeX  int
@@ -150,15 +154,15 @@ func toIsobands(isogons *FeatureCollection, jobId string) (*FeatureCollection, e
 	}
 	defer func() {
 		_ = in.Close()
-		//_ = os.Remove(inPath)
+		_ = os.Remove(inPath)
 	}()
 	encoder := json.NewEncoder(in)
 	err = encoder.Encode(isogons)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
 	}
-	err = execCmd(`Rscript`, `isobands.R`, inPath, outPath, `1000`)
-	//defer func() { _ = os.Remove(outPath) }()
+	err = execCmd(`Rscript`, inPath, outPath, `1000`)
+	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
@@ -285,7 +289,9 @@ func contourToRing(contour contourmap.Contour, grid GridValues) orb.Ring {
 func execCmd(name string, args ...string) error {
 	stdErr := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 	stdOut := bytes.NewBuffer(make([]byte, 0, 1024*1024))
-	cmd := exec.Command(name, args...)
+	fullArgs := append([]string{`-`}, args...)
+	cmd := exec.Command(name, fullArgs...)
+	cmd.Stdin = bytes.NewReader(rScript)
 	cmd.Stderr = stdErr
 	cmd.Stdout = stdOut
 	err := cmd.Run()
