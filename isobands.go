@@ -14,6 +14,7 @@ import (
 	"github.com/fogleman/contourmap"
 	"github.com/google/uuid"
 	"github.com/paulmach/orb"
+	"github.com/paulmach/orb/clip"
 	"github.com/paulmach/orb/planar"
 )
 
@@ -85,10 +86,10 @@ func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
 	for stepIndex := 0; stepIndex < numSteps; stepIndex++ {
 		i := start + float64(stepIndex)*step
 		contours := m.Contours(i - levelEpsilon)
-		currentFills := make([]orb.Ring, 0, 10)
-		currentHoles := make([]orb.Ring, 0, 10)
 		levelFloor := i
 		levelTop := i + step
+		currentFills := make([]orb.Polygon, 0, 10)
+		currentHoles := make([]orb.Polygon, 0, 10)
 
 		for _, contour := range contours {
 			ring := contourToRing(contour, grid)
@@ -104,22 +105,37 @@ func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
 			if ring.Orientation() == orb.CW {
 				ring = ring.Clone()
 				ring.Reverse()
-				currentFills = append(currentFills, ring)
+				currentFills = append(currentFills, orb.Polygon{ring})
 			} else {
 				ring = ring.Clone()
 				ring.Reverse()
-				currentHoles = append(currentHoles, ring)
+				currentHoles = append(currentHoles, orb.Polygon{ring})
 			}
 		}
 
-		polys := buildPolygonHierarchy(currentFills, currentHoles)
-		for _, poly := range polys {
-			collection.AddPolygon(poly, map[string]any{
-				`levelIndex`: levelIndex,
-				`floor`:      levelFloor,
-				`ceiling`:    levelTop,
-			})
+		//polys := buildPolygonHierarchy(currentFills, currentHoles)
+		fillFeatures := splitToQuadrants(currentFills)
+		for featurei, feature := range fillFeatures {
+			props := feature.Properties
+			props[`levelIndex`] = levelIndex
+			props[`floor`] = levelFloor
+			props[`ceiling`] = levelTop
+			props[`isHole`] = false
+			fillFeatures[featurei].Properties = props
 		}
+		collection.Features = append(collection.Features, fillFeatures...)
+
+		holeFeatures := splitToQuadrants(currentHoles)
+		for featurei, feature := range holeFeatures {
+			props := feature.Properties
+			props[`levelIndex`] = levelIndex
+			props[`floor`] = levelFloor
+			props[`ceiling`] = levelTop
+			props[`isHole`] = true
+			holeFeatures[featurei].Properties = props
+		}
+		collection.Features = append(collection.Features, holeFeatures...)
+
 		levelIndex++
 	}
 	return collection
@@ -359,4 +375,52 @@ func buildPolygonHierarchy(fills, holes []orb.Ring) []orb.Polygon {
 		polys = append(polys, poly)
 	}
 	return polys
+}
+
+func splitToQuadrants(polys []orb.Polygon) []Feature {
+	features := make([]Feature, 0, len(polys))
+	for _, poly := range polys {
+		for quadi, quad := range quadrants {
+			clipped := clip.Polygon(quad, poly.Clone())
+			for ringi, ring := range clipped {
+				ring = ring.Clone()
+				for i := 1; i < len(ring); i++ {
+					currentPoint := ring[i]
+					priorPoint := ring[i-1]
+					if currentPoint.Equal(priorPoint) {
+						ring = slices.Delete(ring, i-1, i)
+						i--
+					}
+				}
+				clipped[ringi] = ring
+			}
+			if clipped != nil {
+				features = append(features, Feature{
+					Type:       "Feature",
+					Geometry:   Polygon{Type: "Polygon", Coordinates: clipped},
+					Properties: map[string]any{`quadrant`: quadi},
+				})
+			}
+		}
+	}
+	return features
+}
+
+var quadrants = []orb.Bound{
+	{ // top left
+		Min: orb.Point{-180, 0},
+		Max: orb.Point{0, 90},
+	},
+	{ // top right
+		Min: orb.Point{0, 0},
+		Max: orb.Point{180, 90},
+	},
+	{ // bottom left
+		Min: orb.Point{-180, -90},
+		Max: orb.Point{0, 0},
+	},
+	{ // bottom right
+		Min: orb.Point{0, -90},
+		Max: orb.Point{180, 0},
+	},
 }
