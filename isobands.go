@@ -165,16 +165,14 @@ func toIsobands(isogons *FeatureCollection, jobId string, workDir string) (*Feat
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to create input file: %w", err)
 	}
-	defer func() {
-		_ = in.Close()
-		_ = os.Remove(inPath)
-	}()
 	encoder := json.NewEncoder(in)
 	err = encoder.Encode(isogons)
+	_ = in.Close()
+	defer func() { _ = os.Remove(inPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
 	}
-	err = execCmd(`Rscript`, inPath, outPath, `1000`)
+	err = execCmd(`Rscript`, inPath, outPath, `2000`)
 	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
