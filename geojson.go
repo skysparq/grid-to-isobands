@@ -22,7 +22,7 @@ type Polygon struct {
 }
 
 func NewFeatureCollection(props map[string]any) *FeatureCollection {
-	return &FeatureCollection{Type: "FeatureCollection", Properties: props}
+	return &FeatureCollection{Type: "FeatureCollection", Properties: props, Features: make([]Feature, 0)}
 }
 
 func (fc *FeatureCollection) AddRing(ring orb.Ring, props map[string]any) {
