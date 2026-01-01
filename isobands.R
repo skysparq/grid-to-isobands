@@ -128,12 +128,8 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   }
   
   # Combine results
-  if (length(final_results) > 0) {
-    all_features <- do.call(rbind, final_results)
-    st_write(all_features, output_path, delete_dsn = TRUE, quiet = TRUE)
-  } else {
-    cat("No valid features to write\n")
-  }
+  all_features <- do.call(rbind, final_results)
+  st_write(all_features, output_path, delete_dsn = TRUE, quiet = TRUE)
 }
 
 # Usage
