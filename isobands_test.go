@@ -31,6 +31,7 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 			`measure`: `base-reflectivity`,
 			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
 		},
+		Tolerance: 1000,
 	}
 	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
 	if err != nil {
@@ -71,7 +72,8 @@ func TestGfsBaroPressure(t *testing.T) {
 			`measure`: `baro-pressure-msl`,
 			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
 		},
-		WorkDir: "./tmp",
+		WorkDir:   "./tmp",
+		Tolerance: 5000,
 	}
 	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
 	if err != nil {
@@ -112,14 +114,15 @@ func TestSurfaceTemp(t *testing.T) {
 			`measure`: `temperature-surface`,
 			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
 		},
-		WorkDir: "./tmp",
+		WorkDir:   "./tmp",
+		Tolerance: 5000,
 	}
 	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./temperature-surface-2025-10-03T120000.json`)
+	out, err := os.Create(`./temperature-surface.json`)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -31,12 +31,12 @@ type GridValues struct {
 }
 
 type IsobandArgs struct {
-	Grid                GridValues
-	InitialTransform    InitialTransformer
-	PostSmoothTransform PostSmoothTransformer
-	Floor, Step         float64
-	AddlProps           map[string]any
-	WorkDir             string
+	Grid                   GridValues
+	InitialTransform       InitialTransformer
+	PostSmoothTransform    PostSmoothTransformer
+	Floor, Step, Tolerance float64
+	AddlProps              map[string]any
+	WorkDir                string
 }
 
 func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
@@ -50,7 +50,7 @@ func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
 	jobId := uuid.NewString()
 	grid = preprocessGrid(args)
 	isogons := createIsogons(grid, floor, step)
-	isobands, err := toIsobands(isogons, jobId, workDir)
+	isobands, err := toIsobands(isogons, jobId, workDir, args.Tolerance)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
@@ -166,7 +166,7 @@ func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
 	return collection
 }
 
-func toIsobands(isogons *FeatureCollection, jobId string, workDir string) (*FeatureCollection, error) {
+func toIsobands(isogons *FeatureCollection, jobId string, workDir string, tolerance float64) (*FeatureCollection, error) {
 	inPath := densePath(jobId, workDir)
 	outPath := simplePath(jobId, workDir)
 	in, err := os.Create(inPath)
@@ -176,11 +176,11 @@ func toIsobands(isogons *FeatureCollection, jobId string, workDir string) (*Feat
 	encoder := json.NewEncoder(in)
 	err = encoder.Encode(isogons)
 	_ = in.Close()
-	defer func() { _ = os.Remove(inPath) }()
+	//defer func() { _ = os.Remove(inPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
 	}
-	err = execCmd(`Rscript`, inPath, outPath, `2000`)
+	err = execCmd(`Rscript`, inPath, outPath, fmt.Sprintf(`%0.2f`, tolerance))
 	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
@@ -291,6 +291,7 @@ func maxFloor(floor, val1, val2 float64) float64 {
 }
 
 func contourToRing(contour contourmap.Contour, grid GridValues) orb.Ring {
+
 	ring := make(orb.Ring, 0, 10)
 	width := grid.SizeX
 	height := grid.SizeY
@@ -301,7 +302,6 @@ func contourToRing(contour contourmap.Contour, grid GridValues) orb.Ring {
 		orbPoint := orb.Point{lng, lat}
 		ring = append(ring, orbPoint)
 	}
-
 	return ring
 }
 
