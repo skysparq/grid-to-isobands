@@ -63,11 +63,11 @@ func TestGfsBaroPressure(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:                gridValues,
-		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
-		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
-		Floor:               0,
-		Step:                250,
+		Grid:             gridValues,
+		InitialTransform: grid_to_isobands.SwapRightAndLeft,
+		Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 1, Bottom: 1},
+		Floor:            0,
+		Step:             250,
 		AddlProps: map[string]any{
 			`measure`: `baro-pressure-msl`,
 			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
@@ -105,11 +105,11 @@ func TestSurfaceTemp(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:                gridValues,
-		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
-		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
-		Floor:               0,
-		Step:                2,
+		Grid:             gridValues,
+		InitialTransform: grid_to_isobands.SwapRightAndLeft,
+		Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 40, Bottom: 40},
+		Floor:            0,
+		Step:             2,
 		AddlProps: map[string]any{
 			`measure`: `temperature-surface`,
 			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
@@ -147,11 +147,11 @@ func TestWindU(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:                gridValues,
-		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
-		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
-		Floor:               -1000,
-		Step:                10,
+		Grid:             gridValues,
+		InitialTransform: grid_to_isobands.SwapRightAndLeft,
+		Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 40, Bottom: 40},
+		Floor:            -1000,
+		Step:             10,
 		AddlProps: map[string]any{
 			`measure`: `wind-u-100hpa`,
 			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),

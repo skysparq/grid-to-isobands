@@ -33,10 +33,17 @@ type GridValues struct {
 type IsobandArgs struct {
 	Grid                   GridValues
 	InitialTransform       InitialTransformer
-	PostSmoothTransform    PostSmoothTransformer
 	Floor, Step, Tolerance float64
+	Clip                   Clip
 	AddlProps              map[string]any
 	WorkDir                string
+}
+
+type Clip struct {
+	Top    int
+	Bottom int
+	Left   int
+	Right  int
 }
 
 func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
@@ -79,22 +86,14 @@ func preprocessGrid(args IsobandArgs) GridValues {
 	vals.Values = morph.OpenClose(vals.Values, 3)
 	vals.Values = FastGaussian(vals.Values, vals.SizeX, vals.SizeY, 3, 0.5)
 
-	// replace edge of grid with sentinel values
+	// clip grid with sentinel values
 	for y := 0; y < vals.SizeY; y++ {
-		if y == 0 || y == vals.SizeY-1 {
-			for x := 0; x < vals.SizeX; x++ {
-				vals.Values[y*vals.SizeX+x] = sentinel
+		for x := 0; x < vals.SizeX; x++ {
+			if x < args.Clip.Left || x > args.Grid.SizeX-args.Clip.Right || y < args.Clip.Bottom || y > args.Grid.SizeY-args.Clip.Top {
+				i := y*vals.SizeX + x
+				vals.Values[i] = sentinel
 			}
-			continue
 		}
-		left := y * vals.SizeX
-		right := (y+1)*vals.SizeX - 1
-		vals.Values[left] = sentinel
-		vals.Values[right] = sentinel
-	}
-
-	if args.PostSmoothTransform != nil {
-		vals.Values = args.PostSmoothTransform(vals.Values, vals.SizeX, sentinel, args.Floor, args.Step)
 	}
 
 	return vals
