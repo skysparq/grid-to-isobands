@@ -46,6 +46,7 @@ func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
 	if workDir == "" {
 		workDir = `./tmp`
 	}
+	floor = math.Floor(sliceMinFromFloor(args.Grid.Values, floor)/step) * step
 
 	jobId := uuid.NewString()
 	grid = preprocessGrid(args)
@@ -243,6 +244,14 @@ func minMax(values []float64, floor float64) (float64, float64) {
 	}
 	return minVal, maxVal
 
+}
+
+func sliceMinFromFloor(values []float64, floor float64) float64 {
+	minVal := math.NaN()
+	for _, val := range values {
+		minVal = minFloor(floor, minVal, val)
+	}
+	return minVal
 }
 
 func minFloor(floor, val1, val2 float64) float64 {

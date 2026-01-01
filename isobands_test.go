@@ -134,6 +134,48 @@ func TestSurfaceTemp(t *testing.T) {
 	}
 }
 
+func TestWindU(t *testing.T) {
+	testData, err := getTestData(`wind-u-100hpa.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := grid_to_isobands.IsobandArgs{
+		Grid:                gridValues,
+		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
+		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
+		Floor:               -1000,
+		Step:                10,
+		AddlProps: map[string]any{
+			`measure`: `wind-u-100hpa`,
+			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
+		},
+		WorkDir:   "./tmp",
+		Tolerance: 5000,
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := os.Create(`./wind-u-100hpa.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	encoder := json.NewEncoder(out)
+	err = encoder.Encode(isogons)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func getTestData(filename string) (TestData, error) {
 	var testData TestData
 	f, err := os.Open(filepath.Join(`./.test_files`, filename))
