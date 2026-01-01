@@ -31,15 +31,16 @@ type GridValues struct {
 }
 
 type IsobandArgs struct {
-	Grid        GridValues
-	Transform   Transformer
-	Floor, Step float64
-	AddlProps   map[string]any
-	WorkDir     string
+	Grid                GridValues
+	InitialTransform    InitialTransformer
+	PostSmoothTransform PostSmoothTransformer
+	Floor, Step         float64
+	AddlProps           map[string]any
+	WorkDir             string
 }
 
 func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
-	grid, transform, floor, step := args.Grid, args.Transform, args.Floor, args.Step
+	grid, floor, step := args.Grid, args.Floor, args.Step
 	addlProps := args.AddlProps
 	workDir := args.WorkDir
 	if workDir == "" {
@@ -47,7 +48,7 @@ func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
 	}
 
 	jobId := uuid.NewString()
-	grid = preprocessGrid(grid, transform, floor, step)
+	grid = preprocessGrid(args)
 	isogons := createIsogons(grid, floor, step)
 	isobands, err := toIsobands(isogons, jobId, workDir)
 	if err != nil {
@@ -57,37 +58,44 @@ func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
 	return isobands, nil
 }
 
-func preprocessGrid(vals GridValues, transform Transformer, floor, step float64) GridValues {
-	vals.Values = transform(vals.Values, vals.SizeX)
-	vals.Lons = transform(vals.Lons, vals.SizeX)
-	vals.Lats = transform(vals.Lats, vals.SizeX)
-	sentinel := floor - (step * 10)
+func preprocessGrid(args IsobandArgs) GridValues {
+	vals := args.Grid
+	if args.InitialTransform != nil {
+		initialTransform := args.InitialTransform
+		vals.Values = initialTransform(vals.Values, vals.SizeX)
+		vals.Lons = initialTransform(vals.Lons, vals.SizeX)
+		vals.Lats = initialTransform(vals.Lats, vals.SizeX)
+	}
+	sentinel := args.Floor - (args.Step * 10)
 	// replace invalid values with a value much lower than floor
 	for i, value := range vals.Values {
-		if math.IsNaN(value) || math.IsInf(value, 0) || value < floor {
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < args.Floor {
 			vals.Values[i] = sentinel
 		}
 	}
 
 	morph := NewMorphologicalOps(vals.SizeX, vals.SizeY)
-	morphed := morph.OpenClose(vals.Values, 3)
-	smoothed := FastGaussian(morphed, vals.SizeX, vals.SizeY, 3, 0.5)
+	vals.Values = morph.OpenClose(vals.Values, 3)
+	vals.Values = FastGaussian(vals.Values, vals.SizeX, vals.SizeY, 3, 0.5)
 
 	// replace edge of grid with sentinel values
 	for y := 0; y < vals.SizeY; y++ {
 		if y == 0 || y == vals.SizeY-1 {
 			for x := 0; x < vals.SizeX; x++ {
-				smoothed[y*vals.SizeX+x] = sentinel
+				vals.Values[y*vals.SizeX+x] = sentinel
 			}
 			continue
 		}
 		left := y * vals.SizeX
 		right := (y+1)*vals.SizeX - 1
-		smoothed[left] = sentinel
-		smoothed[right] = sentinel
+		vals.Values[left] = sentinel
+		vals.Values[right] = sentinel
 	}
 
-	vals.Values = smoothed
+	if args.PostSmoothTransform != nil {
+		vals.Values = args.PostSmoothTransform(vals.Values, vals.SizeX, sentinel, args.Floor, args.Step)
+	}
+
 	return vals
 }
 

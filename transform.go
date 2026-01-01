@@ -1,6 +1,7 @@
 package grid_to_isobands
 
-type Transformer func(values []float64, width int) []float64
+type InitialTransformer func(values []float64, width int) []float64
+type PostSmoothTransformer func(vals []float64, width int, sentinel, floor, step float64) []float64
 
 func NoopTransform(values []float64, _ int) []float64 {
 	return values
@@ -20,4 +21,18 @@ func SwapRightAndLeft(values []float64, width int) []float64 {
 		copy(values[rightStart:rightEnd], left)
 	}
 	return values
+}
+
+func RemoveTop10DegreesFromGlobal0p25Grid(vals []float64, width int, sentinel, floor, step float64) []float64 {
+	height := len(vals) / width
+	rowsToRemove := 4 * 10
+	for y := 0; y < rowsToRemove; y++ {
+		for x := 0; x < width; x++ {
+			top := (y * width) + x
+			bottom := ((height - 1 - y) * width) + x
+			vals[top] = sentinel
+			vals[bottom] = sentinel
+		}
+	}
+	return vals
 }

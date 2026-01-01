@@ -24,10 +24,9 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:      gridValues,
-		Transform: grid_to_isobands.NoopTransform,
-		Floor:     5,
-		Step:      2.5,
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
 		AddlProps: map[string]any{
 			`measure`: `base-reflectivity`,
 			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
@@ -63,10 +62,11 @@ func TestGfsBaroPressure(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:      gridValues,
-		Transform: grid_to_isobands.SwapRightAndLeft,
-		Floor:     0,
-		Step:      250,
+		Grid:                gridValues,
+		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
+		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
+		Floor:               0,
+		Step:                250,
 		AddlProps: map[string]any{
 			`measure`: `baro-pressure-msl`,
 			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
@@ -103,10 +103,11 @@ func TestSurfaceTemp(t *testing.T) {
 		Values: testData.Values,
 	}
 	args := grid_to_isobands.IsobandArgs{
-		Grid:      gridValues,
-		Transform: grid_to_isobands.SwapRightAndLeft,
-		Floor:     0,
-		Step:      2,
+		Grid:                gridValues,
+		InitialTransform:    grid_to_isobands.SwapRightAndLeft,
+		PostSmoothTransform: grid_to_isobands.RemoveTop10DegreesFromGlobal0p25Grid,
+		Floor:               0,
+		Step:                2,
 		AddlProps: map[string]any{
 			`measure`: `temperature-surface`,
 			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
