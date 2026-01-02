@@ -21,3 +21,19 @@ func SwapRightAndLeft(values []float64, width int) []float64 {
 	}
 	return values
 }
+
+func ReverseVertical(values []float64, width int) []float64 {
+	height := len(values) / width
+	maxY := height - 1
+	bottomCopy := make([]float64, width)
+	for i := 0; i < height/2; i++ {
+		bottomStart := i * width
+		bottomEnd := bottomStart + width
+		topStart := (maxY - i) * width
+		topEnd := topStart + width
+		copy(bottomCopy, values[bottomStart:bottomEnd])
+		copy(values[bottomStart:bottomEnd], values[topStart:topEnd])
+		copy(values[topStart:topEnd], bottomCopy)
+	}
+	return values
+}

@@ -36,3 +36,39 @@ func TestSwapOddSizedRows(t *testing.T) {
 		t.Fatalf(`expected %v, got %v`, expected, values)
 	}
 }
+
+func TestReverseVerticalOdd(t *testing.T) {
+	values := []float64{
+		1, 2, 3, 4, 5,
+		6, 7, 8, 9, 10,
+		11, 12, 13, 14, 15,
+	}
+	values = grid_to_isobands.ReverseVertical(values, 5)
+	expected := []float64{
+		11, 12, 13, 14, 15,
+		6, 7, 8, 9, 10,
+		1, 2, 3, 4, 5,
+	}
+	if !slices.Equal(values, expected) {
+		t.Fatalf(`expected %v, got %v`, expected, values)
+	}
+}
+
+func TestReverseVerticalEven(t *testing.T) {
+	values := []float64{
+		1, 2, 3,
+		4, 5, 6,
+		7, 8, 9,
+		10, 11, 12,
+	}
+	values = grid_to_isobands.ReverseVertical(values, 3)
+	expected := []float64{
+		10, 11, 12,
+		7, 8, 9,
+		4, 5, 6,
+		1, 2, 3,
+	}
+	if !slices.Equal(values, expected) {
+		t.Fatalf(`expected %v, got %v`, expected, values)
+	}
+}
