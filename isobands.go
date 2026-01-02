@@ -176,7 +176,7 @@ func toIsobands(isogons *FeatureCollection, jobId string, workDir string, tolera
 	encoder := json.NewEncoder(in)
 	err = encoder.Encode(isogons)
 	_ = in.Close()
-	//defer func() { _ = os.Remove(inPath) }()
+	defer func() { _ = os.Remove(inPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
 	}
