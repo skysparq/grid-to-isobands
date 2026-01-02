@@ -79,6 +79,18 @@ func TestGenerateVisibilitySurface(t *testing.T) {
 	}
 }
 
+func TestGenerateReflectivityAtmosphere(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
+		"https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20251002/12/atmos/gfs.t12z.pgrb2.0p25.f022",
+		"reflectivity-atmosphere.json",
+		9,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generateTestData(url string, dest string, index int) error {
 	err := os.MkdirAll(`./.test_files`, 0755)
 	if err != nil {

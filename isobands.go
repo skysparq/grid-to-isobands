@@ -89,7 +89,7 @@ func preprocessGrid(args IsobandArgs) GridValues {
 	// clip grid with sentinel values
 	for y := 0; y < vals.SizeY; y++ {
 		for x := 0; x < vals.SizeX; x++ {
-			if x < args.Clip.Left || x > args.Grid.SizeX-args.Clip.Right || y < args.Clip.Bottom || y > args.Grid.SizeY-args.Clip.Top {
+			if x < args.Clip.Left || x > args.Grid.SizeX-args.Clip.Right-1 || y < args.Clip.Bottom || y > args.Grid.SizeY-args.Clip.Top-1 {
 				i := y*vals.SizeX + x
 				vals.Values[i] = sentinel
 			}
