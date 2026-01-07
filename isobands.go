@@ -54,6 +54,7 @@ func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
 		workDir = `./tmp`
 	}
 	floor = math.Floor(sliceMinFromFloor(args.Grid.Values, floor)/step) * step
+	args.Floor = floor
 
 	jobId := uuid.NewString()
 	grid = preprocessGrid(args)
@@ -74,7 +75,7 @@ func preprocessGrid(args IsobandArgs) GridValues {
 		vals.Lons = initialTransform(vals.Lons, vals.SizeX)
 		vals.Lats = initialTransform(vals.Lats, vals.SizeX)
 	}
-	sentinel := args.Floor - (args.Step * 10)
+	sentinel := args.Floor - args.Step
 	// replace invalid values with a value much lower than floor
 	for i, value := range vals.Values {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value < args.Floor {

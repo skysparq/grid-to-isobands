@@ -78,14 +78,12 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
     final_results_q <- list()
     accumulated_mask <- NULL
     
-    i <- 0
     for (level_idx in levels) {
       level_key <- as.character(level_idx)
       if (!level_key %in% names(levels_combined)) next
       
       current_level <- levels_combined[[level_key]]
-      i <- i + 1
-      
+
       # Erase accumulated mask from current level
       if (!is.null(accumulated_mask)) {
         current_level <- st_difference(current_level, accumulated_mask, dimension='polygon')
