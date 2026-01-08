@@ -91,6 +91,46 @@ func TestMrmsBaseReflectivity2(t *testing.T) {
 	}
 }
 
+func TestMrmsCompositeReflectivity(t *testing.T) {
+	testData, err := getTestData(`mrms-composite-reflectivity.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := grid_to_isobands.IsobandArgs{
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
+		AddlProps: map[string]any{
+			`measure`: `composite-reflectivity`,
+			`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
+		},
+		Tolerance: 1000,
+		Clip:      grid_to_isobands.Clip{Top: 1, Bottom: 1, Left: 1, Right: 1},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := os.Create(`./composite-reflectivity.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	encoder := json.NewEncoder(out)
+	err = encoder.Encode(isogons)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGfsBaroPressure(t *testing.T) {
 	testData, err := getTestData(`gfs-baro-pressure-msl.json`)
 	if err != nil {

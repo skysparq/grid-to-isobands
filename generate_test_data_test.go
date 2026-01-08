@@ -103,6 +103,18 @@ func TestGenerateBaseReflectivity2(t *testing.T) {
 	}
 }
 
+func TestGenerateCompositeReflectivity(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
+		`https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MergedReflectivityComposite_00.50/20260107/MRMS_MergedReflectivityComposite_00.50_20260107-190236.grib2.gz`,
+		`mrms-composite-reflectivity.json`,
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generateTestData(url string, dest string, index int) error {
 	err := os.MkdirAll(`./.test_files`, 0755)
 	if err != nil {
