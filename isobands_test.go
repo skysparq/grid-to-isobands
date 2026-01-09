@@ -31,7 +31,7 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 			`measure`: `base-reflectivity`,
 			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
 		},
-		Tolerance: 1000,
+		Tolerance: 500,
 		Clip:      grid_to_isobands.Clip{Top: 1, Bottom: 1, Left: 1, Right: 1},
 	}
 	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
@@ -202,6 +202,48 @@ func TestGfsBaroPressure(t *testing.T) {
 	}
 
 	out, err := os.Create(`./baro-pressure-msl.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	encoder := json.NewEncoder(out)
+	err = encoder.Encode(isogons)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGfsBaroPressure2(t *testing.T) {
+	testData, err := getTestData(`gfs-baro-pressure-msl-2.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := grid_to_isobands.IsobandArgs{
+		Grid:             gridValues,
+		InitialTransform: grid_to_isobands.SwapRightAndLeft,
+		Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 40, Bottom: 40},
+		Floor:            0,
+		Step:             250,
+		AddlProps: map[string]any{
+			`measure`: `baro-pressure-msl`,
+			`at`:      time.Date(2026, 1, 9, 6, 0, 0, 0, time.UTC).Add(366 * time.Hour),
+		},
+		WorkDir:   "./tmp",
+		Tolerance: 5000,
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := os.Create(`./baro-pressure-msl-2.json`)
 	if err != nil {
 		t.Fatal(err)
 	}

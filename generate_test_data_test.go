@@ -127,6 +127,18 @@ func TestGenerateCompositeReflectivity2(t *testing.T) {
 	}
 }
 
+func TestGenerateBaroPressureMsl2(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
+		`https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20260109/06/atmos/gfs.t06z.pgrb2.0p25.f366`,
+		`gfs-baro-pressure-msl-2.json`,
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generateTestData(url string, dest string, index int) error {
 	err := os.MkdirAll(`./.test_files`, 0755)
 	if err != nil {

@@ -40,34 +40,41 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
       fills <- level_polys %>% filter(!isHole) %>% arrange(desc(area))
       holes <- level_polys %>% filter(isHole) %>% arrange(desc(area))
       
-      # Initialize with union of fills
-      if (nrow(fills) > 0) {
-        combined_geom <- st_union(st_sfc(fills$geometry, crs = st_crs(fills)))
-        combined_geom <- st_make_valid(combined_geom)
-      } else {
-        combined_geom <- st_sfc(crs = st_crs(level_polys))
-      }
-      
-      # Then subtract holes one by one
-      for (i in 1:nrow(holes)) {
-        hole_geom <- holes$geometry[i]
-        area <- holes$area[i]
-
-        inter <- st_intersects(combined_geom, hole_geom, sparse = FALSE)
-        if (any(inter)) {
-          tryCatch({
-            combined_geom <- st_difference(combined_geom, hole_geom, dimension='polygon')
-            combined_geom <- st_make_valid(combined_geom)
-          }, error = function(e) {
-            cat(sprintf("Warning: Error differencing hole: %s\n", e$message))
-          })
-        }
-      }
+      combined_geom <- fills %>%
+        rowwise() %>%
+        mutate(
+          geometry = {
+            fill_geom <- geometry  # Capture the current fill's geometry
+            
+            if (nrow(holes) > 0) {
+              # Find holes that intersect this fill
+              intersects <- st_intersects(fill_geom, st_sfc(holes$geometry, crs = st_crs(fill_geom)), sparse = FALSE)[1,]
+              relevant_holes <- holes[intersects, ]
+              
+              if (nrow(relevant_holes) > 0) {
+                # Check which ones completely contain the fill
+                covered <- st_covered_by(fill_geom, st_sfc(relevant_holes$geometry, crs = st_crs(fill_geom)), sparse = FALSE)[1,]
+                relevant_holes <- relevant_holes[!covered, ]
+              }
+              
+              if (nrow(relevant_holes) > 0) {
+                combined_holes <- st_union(st_sfc(relevant_holes$geometry, crs = st_crs(fill_geom)))
+                st_difference(fill_geom, combined_holes, dimension='polygon')
+              } else {
+                fill_geom
+              }
+            } else {
+              fill_geom
+            }
+          }
+        ) %>%
+        ungroup() %>%
+        st_as_sf() %>%
+        st_make_valid()
       
       # Convert to sf if not empty
       if (length(combined_geom) > 0 && !all(st_is_empty(combined_geom))) {
-        combined_sf <- st_sf(geometry = combined_geom, levelIndex = level_idx, quadrant = q, floor = level_polys[["floor"]][1], ceiling = level_polys[["ceiling"]][1])
-        combined_sf <- st_make_valid(combined_sf)
+        combined_sf <- st_make_valid(combined_geom)
         combined_sf <- only_polys(combined_sf)
 
         levels_combined[[as.character(level_idx)]] <- combined_sf
