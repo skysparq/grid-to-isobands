@@ -83,22 +83,23 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
       if (!level_key %in% names(levels_combined)) next
       
       current_level <- levels_combined[[level_key]]
+      punched <- current_level
 
       # Erase accumulated mask from current level
       if (!is.null(accumulated_mask)) {
-        current_level <- st_difference(current_level, accumulated_mask, dimension='polygon')
-        current_level <- st_make_valid(current_level)
-        current_level <- only_polys(current_level)
+        punched <- st_difference(current_level, accumulated_mask, dimension='polygon')
+        punched <- st_make_valid(punched)
+        punched <- only_polys(punched)
       }
       
       # Remove empty geometries
-      if (nrow(current_level) > 0) {
-        current_level <- current_level[!st_is_empty(current_level), ]
+      if (nrow(punched) > 0) {
+        punched <- punched[!st_is_empty(punched), ]
       }
       
-      if (nrow(current_level) > 0) {
-        casted <- lapply(1:nrow(current_level), function(i) {
-          st_cast(current_level[i, ], "POLYGON")
+      if (nrow(punched) > 0) {
+        casted <- lapply(1:nrow(punched), function(i) {
+          st_cast(punched[i, ], "POLYGON")
         }) %>% do.call(rbind, .)
         final_results_q[[level_key]] <- casted
       }
