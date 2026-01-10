@@ -11,8 +11,8 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
   options(s2_oriented = TRUE)
   sf_use_s2(TRUE)
   data <- st_read(input_path, quiet = TRUE)
+  data <- st_set_precision(data, 10000)
   data <- st_make_valid(data)
-
   simplified <- st_simplify(data, preserveTopology = TRUE, dTolerance = tolerance_meters)
   simplified <- only_polys(simplified)
   
