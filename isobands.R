@@ -45,29 +45,50 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
         mutate(
           geometry = {
             fill_geom <- geometry  # Capture the current fill's geometry
-  
+            
             if (nrow(holes) > 0) {
               # Find holes that intersect this fill
               intersects <- st_intersects(fill_geom, st_sfc(holes$geometry, crs = st_crs(fill_geom)), sparse = FALSE)[1,]
               relevant_holes <- holes[intersects, ]
-  
+              
               if (nrow(relevant_holes) > 0) {
                 # Check which ones completely contain the fill
                 covered <- st_covered_by(fill_geom, st_sfc(relevant_holes$geometry, crs = st_crs(fill_geom)), sparse = FALSE)[1,]
                 relevant_holes <- relevant_holes[!covered, ]
               }
-  
+              
               if (nrow(relevant_holes) > 0) {
                 combined_holes <- st_union(st_sfc(relevant_holes$geometry, crs = st_crs(fill_geom)))
-                diff_result <- st_difference(fill_geom, combined_holes, dimension='polygon')
-                diff_result <- st_make_valid(diff_result)
-  
-                # Handle empty or zero-length results
-                if (length(diff_result) == 0 || all(st_is_empty(diff_result))) {
-                  fill_geom  # Return original if empty
-                } else {
-                  diff_result
-                }
+                
+                # Try difference with error handling
+                diff_result <- tryCatch({
+                  result <- st_difference(fill_geom, combined_holes, dimension='polygon')
+                  
+                  # Check if result is valid
+                  if (length(result) == 0 || all(st_is_empty(result))) {
+                    fill_geom
+                  } else {
+                    result
+                  }
+                }, error = function(e) {
+                  # If difference fails due to invalid geometry, try to make valid first
+                  tryCatch({
+                    valid_fill <- st_make_valid(fill_geom)
+                    valid_holes <- st_make_valid(combined_holes)
+                    result <- st_difference(valid_fill, valid_holes, dimension='polygon')
+                    
+                    if (length(result) == 0 || all(st_is_empty(result))) {
+                      fill_geom
+                    } else {
+                      result
+                    }
+                  }, error = function(e2) {
+                    # If still fails, return original geometry
+                    fill_geom
+                  })
+                })
+                
+                diff_result
               } else {
                 fill_geom
               }
