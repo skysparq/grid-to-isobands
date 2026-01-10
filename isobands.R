@@ -60,6 +60,7 @@ process_isobands <- function(input_path, output_path, tolerance_meters = 100) {
               if (nrow(relevant_holes) > 0) {
                 combined_holes <- st_union(st_sfc(relevant_holes$geometry, crs = st_crs(fill_geom)))
                 diff_result <- st_difference(fill_geom, combined_holes, dimension='polygon')
+                diff_result <- st_make_valid(diff_result)
   
                 # Handle empty or zero-length results
                 if (length(diff_result) == 0 || all(st_is_empty(diff_result))) {
