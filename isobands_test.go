@@ -39,13 +39,7 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./base-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `base-reflectivity.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,13 +73,7 @@ func TestMrmsBaseReflectivity2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./base-reflectivity-2.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `base-reflectivity-2.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,13 +107,7 @@ func TestMrmsCompositeReflectivity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./composite-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `composite-reflectivity.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,13 +141,7 @@ func TestMrmsCompositeReflectivity2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./composite-reflectivity-2.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `composite-reflectivity-2.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,13 +177,7 @@ func TestGfsBaroPressure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./baro-pressure-msl.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `baro-pressure-msl.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,13 +213,7 @@ func TestGfsBaroPressure2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./baro-pressure-msl-2.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `baro-ressure-msl-2.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,13 +249,7 @@ func TestSurfaceTemp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./temperature-surface.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `temperature-surface.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,13 +285,7 @@ func TestWindU(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./wind-u-100hpa.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `wind-u-100hpa.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,13 +321,7 @@ func TestVisibilitySurface(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./visibility-surface.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `visibility-surface.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,13 +357,7 @@ func TestReflectivityAtmosphere(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create(`./reflectivity-atmosphere.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = saveTestOutput(isogons, `reflectivity-atmosphere.json`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +369,7 @@ func getTestData(filename string) (TestData, error) {
 	if err != nil {
 		return testData, fmt.Errorf(`error opening file: %w`, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	decoder := json.NewDecoder(f)
 	err = decoder.Decode(&testData)
 	_ = f.Close()
@@ -437,4 +377,18 @@ func getTestData(filename string) (TestData, error) {
 		return testData, fmt.Errorf(`error decoding test data: %w`, err)
 	}
 	return testData, nil
+}
+
+func saveTestOutput(isogons *grid_to_isobands.FeatureCollection, name string) error {
+	out, err := os.Create(filepath.Join(`./test-output`, name))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = out.Close() }()
+	encoder := json.NewEncoder(out)
+	err = encoder.Encode(isogons)
+	if err != nil {
+		return err
+	}
+	return nil
 }
