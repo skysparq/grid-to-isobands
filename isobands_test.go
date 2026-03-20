@@ -5,11 +5,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	grid_to_isobands "github.com/skysparq/grid-to-isobands"
 )
+
+func TestGenerateLevels(t *testing.T) {
+	levels := grid_to_isobands.GenerateLevels(5, 41.2, 2.5)
+	expected := []float64{
+		5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40, 42.5,
+	}
+	if !slices.Equal(levels, expected) {
+		t.Errorf("got %v, want %v", levels, expected)
+	}
+}
 
 func TestMrmsBaseReflectivity(t *testing.T) {
 	testData, err := getTestData(`mrms-base-reflectivity.json`)

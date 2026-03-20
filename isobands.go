@@ -63,11 +63,13 @@ func preprocessGrid(args *IsobandArgs) {
 	}
 }
 
-func generateLevels(start, stop, step float64) []float64 {
+func GenerateLevels(start, stop, step float64) []float64 {
 	levels := make([]float64, 0, int(stop-start+1))
-	for i := start; i <= stop; i += step {
+	i := 0.0
+	for i = start; i <= stop; i += step {
 		levels = append(levels, i)
 	}
+	levels = append(levels, i)
 	return levels
 }
 
@@ -76,7 +78,7 @@ func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
 		GridValues: args.Grid,
-		Levels:     generateLevels(args.Floor, slices.Max(args.Grid.Values), args.Step),
+		Levels:     GenerateLevels(args.Floor, slices.Max(args.Grid.Values), args.Step),
 	}
 
 	inPath := gridPath(jobId, args.WorkDir)
