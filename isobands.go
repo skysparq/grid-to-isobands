@@ -11,16 +11,12 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/fogleman/contourmap"
+	"github.com/fxamacker/cbor"
 	"github.com/google/uuid"
-	"github.com/paulmach/orb"
-	"github.com/paulmach/orb/clip"
 )
 
-const levelEpsilon = 1e-5
-
-//go:embed isobands.R
-var rScript []byte // Embed the R script as bytes
+//go:embed isobands.py
+var pyScript []byte
 
 type GridValues struct {
 	SizeX  int
@@ -31,165 +27,84 @@ type GridValues struct {
 }
 
 type IsobandArgs struct {
-	Grid                   GridValues
-	InitialTransform       InitialTransformer
-	Floor, Step, Tolerance float64
-	Clip                   Clip
-	AddlProps              map[string]any
-	WorkDir                string
+	Grid         *GridValues
+	Preprocesses []GridTransformer
+	Floor, Step  float64
+	AddlProps    map[string]any
+	WorkDir      string
 }
 
-type Clip struct {
-	Top    int
-	Bottom int
-	Left   int
-	Right  int
+type pyArgs struct {
+	*GridValues
+	Levels []float64
 }
 
-func IsobandsFromGrid(args IsobandArgs) (*FeatureCollection, error) {
-	grid, floor, step := args.Grid, args.Floor, args.Step
-	addlProps := args.AddlProps
-	workDir := args.WorkDir
-	if workDir == "" {
-		workDir = `./tmp`
-	}
-	floor = math.Floor(sliceMinFromFloor(args.Grid.Values, floor)/step) * step
-	args.Floor = floor
-
-	jobId := uuid.NewString()
-	grid = preprocessGrid(args)
-	isogons := createIsogons(grid, floor, step)
-	isobands, err := toIsobands(isogons, jobId, workDir, args.Tolerance)
+func IsobandsFromGrid(args *IsobandArgs) (*FeatureCollection, error) {
+	preprocessGrid(args)
+	isobands, err := toIsobands(args)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
-	isobands.Properties = addlProps
 	return isobands, nil
 }
 
-func preprocessGrid(args IsobandArgs) GridValues {
-	vals := args.Grid
-	if args.InitialTransform != nil {
-		initialTransform := args.InitialTransform
-		vals.Values = initialTransform(vals.Values, vals.SizeX)
-		vals.Lons = initialTransform(vals.Lons, vals.SizeX)
-		vals.Lats = initialTransform(vals.Lats, vals.SizeX)
+func preprocessArgs(args *IsobandArgs) {
+	grid, floor, step := args.Grid, args.Floor, args.Step
+	if args.WorkDir == "" {
+		args.WorkDir = `./tmp`
 	}
-	sentinel := args.Floor - args.Step
-	// replace invalid values with a value much lower than floor
-	for i, value := range vals.Values {
-		if math.IsNaN(value) || math.IsInf(value, 0) || value < args.Floor {
-			vals.Values[i] = sentinel
-		}
-	}
-
-	morph := NewMorphologicalOps(vals.SizeX, vals.SizeY)
-	vals.Values = morph.OpenClose(vals.Values, 3)
-	vals.Values = FastGaussian(vals.Values, vals.SizeX, vals.SizeY, 3, 0.5)
-
-	// clip grid with sentinel values
-	for y := 0; y < vals.SizeY; y++ {
-		for x := 0; x < vals.SizeX; x++ {
-			if x < args.Clip.Left || x > args.Grid.SizeX-args.Clip.Right-1 || y < args.Clip.Bottom || y > args.Grid.SizeY-args.Clip.Top-1 {
-				i := y*vals.SizeX + x
-				vals.Values[i] = sentinel
-			}
-		}
-	}
-
-	return vals
+	floor = math.Floor(sliceMinFromFloor(grid.Values, floor)/step) * step
+	args.Floor = floor
 }
 
-func createIsogons(grid GridValues, floor, step float64) *FeatureCollection {
-	collection := NewFeatureCollection(nil)
-	minVal, maxVal := minMax(grid.Values, floor)
-	m := contourmap.FromFloat64s(grid.SizeX, grid.SizeY, grid.Values)
-
-	start := math.Floor(minVal/step) * step
-	numSteps := int((maxVal - start) / step)
-	levelIndex := 0
-
-	for stepIndex := 0; stepIndex < numSteps; stepIndex++ {
-		i := start + float64(stepIndex)*step
-		contours := m.Contours(i - levelEpsilon)
-		levelFloor := i
-		levelTop := i + step
-		currentFills := make([]orb.Polygon, 0, 10)
-		currentHoles := make([]orb.Polygon, 0, 10)
-
-		for _, contour := range contours {
-			ring := contourToRing(contour, grid)
-
-			if !ring[0].Equal(ring[len(ring)-1]) {
-				ring = append(ring, ring[0]) // close any open loops
-			}
-
-			if len(ring) < 4 {
-				continue
-			}
-
-			if ring.Orientation() == orb.CW {
-				ring = ring.Clone()
-				ring.Reverse()
-				currentFills = append(currentFills, orb.Polygon{ring})
-			} else {
-				ring = ring.Clone()
-				ring.Reverse()
-				currentHoles = append(currentHoles, orb.Polygon{ring})
-			}
-		}
-
-		//polys := buildPolygonHierarchy(currentFills, currentHoles)
-		fillFeatures := splitToQuadrants(currentFills)
-		for featurei, feature := range fillFeatures {
-			props := feature.Properties
-			props[`levelIndex`] = levelIndex
-			props[`floor`] = levelFloor
-			props[`ceiling`] = levelTop
-			props[`isHole`] = false
-			fillFeatures[featurei].Properties = props
-		}
-		collection.Features = append(collection.Features, fillFeatures...)
-
-		holeFeatures := splitToQuadrants(currentHoles)
-		for featurei, feature := range holeFeatures {
-			props := feature.Properties
-			props[`levelIndex`] = levelIndex
-			props[`floor`] = levelFloor
-			props[`ceiling`] = levelTop
-			props[`isHole`] = true
-			holeFeatures[featurei].Properties = props
-		}
-		collection.Features = append(collection.Features, holeFeatures...)
-
-		levelIndex++
+func preprocessGrid(args *IsobandArgs) {
+	for _, preprocess := range args.Preprocesses {
+		preprocess(args.Grid)
 	}
-	return collection
 }
 
-func toIsobands(isogons *FeatureCollection, jobId string, workDir string, tolerance float64) (*FeatureCollection, error) {
-	inPath := densePath(jobId, workDir)
-	outPath := simplePath(jobId, workDir)
+func generateLevels(start, stop, step float64) []float64 {
+	levels := make([]float64, 0, int(stop-start+1))
+	for i := start; i <= stop; i += step {
+		levels = append(levels, i)
+	}
+	return levels
+}
+
+func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
+	preprocessArgs(args)
+	jobId := uuid.NewString()
+	pyData := &pyArgs{
+		GridValues: args.Grid,
+		Levels:     generateLevels(args.Floor, slices.Max(args.Grid.Values), args.Step),
+	}
+
+	inPath := gridPath(jobId, args.WorkDir)
 	in, err := os.Create(inPath)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to create input file: %w", err)
 	}
-	encoder := json.NewEncoder(in)
-	err = encoder.Encode(isogons)
+	encoder := cbor.NewEncoder(in, cbor.EncOptions{})
+	err = encoder.Encode(pyData)
 	_ = in.Close()
 	defer func() { _ = os.Remove(inPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
 	}
-	err = execCmd(`Rscript`, inPath, outPath, fmt.Sprintf(`%0.2f`, tolerance))
+
+	outPath := isobandPath(jobId, args.WorkDir)
+
+	err = execCmd(`python3`, inPath, outPath)
 	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
+
 	banded, err := os.Open(outPath)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to open isobands: %w", err)
 	}
+
 	decoder := json.NewDecoder(banded)
 	isobands := &FeatureCollection{}
 	err = decoder.Decode(isobands)
@@ -198,42 +113,12 @@ func toIsobands(isogons *FeatureCollection, jobId string, workDir string, tolera
 	}
 	for i, feature := range isobands.Features {
 		if feature.Geometry.Coordinates == nil {
-			slices.Delete(isogons.Features, i, i+1)
+			slices.Delete(isobands.Features, i, i+1)
 			i--
 		}
 	}
+	isobands.Properties = args.AddlProps
 	return isobands, nil
-}
-
-func indexToSpatial(x, y float64, width, height int, lngs, lats []float64) (float64, float64) {
-	y1 := int(y)
-	x1 := int(x)
-	x2 := x1 + 1
-	if x2 >= width-1 {
-		x2 = width - 1
-	}
-	y2 := y1 + 1
-	if y2 >= height-1 {
-		y2 = height - 1
-	}
-	i1 := y1*width + x1
-	i2 := y1*width + x2
-	i3 := y2*width + x1
-	i4 := y2*width + x2
-	fx := x - math.Floor(x)
-	fy := y - math.Floor(y)
-
-	lat := (1 - fx) * (1 - fy) * lats[i1]
-	lat += (1 - fx) * fy * lats[i3]
-	lat += fx * (1 - fy) * lats[i2]
-	lat += fx * fy * lats[i4]
-
-	lng := (1 - fx) * (1 - fy) * lngs[i1]
-	lng += (1 - fx) * fy * lngs[i3]
-	lng += fx * (1 - fy) * lngs[i2]
-	lng += fx * fy * lngs[i4]
-
-	return lng, lat
 }
 
 func minMax(values []float64, floor float64) (float64, float64) {
@@ -299,42 +184,49 @@ func maxFloor(floor, val1, val2 float64) float64 {
 	return val2
 }
 
-func contourToRing(contour contourmap.Contour, grid GridValues) orb.Ring {
-
-	ring := make(orb.Ring, 0, 10)
-	width := grid.SizeX
-	height := grid.SizeY
-	lngs := grid.Lons
-	lats := grid.Lats
-	for _, point := range contour {
-		lng, lat := indexToSpatial(point.X, point.Y, width, height, lngs, lats)
-		orbPoint := orb.Point{lng, lat}
-		ring = append(ring, orbPoint)
-	}
-	return ring
-}
-
 func execCmd(name string, args ...string) error {
 	stdErr := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 	stdOut := bytes.NewBuffer(make([]byte, 0, 1024*1024))
-	fullArgs := append([]string{`-`}, args...)
+
+	fullArgs := append([]string{"-"}, args...)
 	cmd := exec.Command(name, fullArgs...)
-	cmd.Stdin = bytes.NewReader(rScript)
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
 	cmd.Stderr = stdErr
 	cmd.Stdout = stdOut
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("error executing %v: %w: %v\nstdout: %v", name, err, stdErr.String(), stdOut.String())
+
+	if err := cmd.Start(); err != nil {
+		return err
 	}
+
+	// Write the script
+	if _, err := stdin.Write(pyScript); err != nil {
+		_ = stdin.Close()
+		_ = cmd.Process.Kill() // best-effort
+		return err
+	}
+
+	_ = stdin.Close() // ← This sends EOF to Python → crucial!
+
+	if err = cmd.Wait(); err != nil {
+		return fmt.Errorf("error executing %v: %w\nstderr: %s\nstdout: %s",
+			name, err, stdErr.String(), stdOut.String())
+	}
+
+	// Optionally: check stdOut / process output here if needed
 	return nil
 }
 
-func densePath(jobId, workDir string) string {
-	return tmpFilePath(jobId+`-dense.geojson`, workDir)
+func gridPath(jobId, workDir string) string {
+	return tmpFilePath(jobId+`.cbor`, workDir)
 }
 
-func simplePath(jobId, workDir string) string {
-	return tmpFilePath(jobId+`-simple.geojson`, workDir)
+func isobandPath(jobId, workDir string) string {
+	return tmpFilePath(jobId+`.geojson`, workDir)
 }
 
 func tmpFilePath(filename, workDir string) string {
@@ -344,52 +236,4 @@ func tmpFilePath(filename, workDir string) string {
 		return path
 	}
 	return absPath
-}
-
-func splitToQuadrants(polys []orb.Polygon) []Feature {
-	features := make([]Feature, 0, len(polys))
-	for _, poly := range polys {
-		for quadi, quad := range quadrants {
-			clipped := clip.Polygon(quad, poly.Clone())
-			for ringi, ring := range clipped {
-				ring = ring.Clone()
-				for i := 1; i < len(ring); i++ {
-					currentPoint := ring[i]
-					priorPoint := ring[i-1]
-					if currentPoint.Equal(priorPoint) {
-						ring = slices.Delete(ring, i-1, i)
-						i--
-					}
-				}
-				clipped[ringi] = ring
-			}
-			if clipped != nil {
-				features = append(features, Feature{
-					Type:       "Feature",
-					Geometry:   Polygon{Type: "Polygon", Coordinates: clipped},
-					Properties: map[string]any{`quadrant`: quadi},
-				})
-			}
-		}
-	}
-	return features
-}
-
-var quadrants = []orb.Bound{
-	{ // top left
-		Min: orb.Point{-180, 0},
-		Max: orb.Point{0, 90},
-	},
-	{ // top right
-		Min: orb.Point{0, 0},
-		Max: orb.Point{180, 90},
-	},
-	{ // bottom left
-		Min: orb.Point{-180, -90},
-		Max: orb.Point{0, 0},
-	},
-	{ // bottom right
-		Min: orb.Point{0, -90},
-		Max: orb.Point{180, 0},
-	},
 }

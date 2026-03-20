@@ -31,16 +31,6 @@ func gaussianKernel1D(size int, sigma float64) []float64 {
 	return kernel
 }
 
-func clamp(val, min, max int) int {
-	if val < min {
-		return min
-	}
-	if val > max {
-		return max
-	}
-	return val
-}
-
 // separableConvolve2D performs separable 2D convolution
 func separableConvolve2D(data *mat.Dense, kernel []float64) *mat.Dense {
 	rows, cols := data.Dims()
