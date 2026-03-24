@@ -10,19 +10,19 @@ import (
 //  1. Spatial kernel fully precomputed (eliminates radius^2 * W * H Exp calls)
 //  2. Range kernel approximated via LUT keyed on discretized dBZ difference
 //  3. Interior pixels processed without bounds checks
-func BilateralFilter(data []float64, width, height int, sigmaSpatial, sigmaRange float64) []float64 {
+func BilateralFilter(data []float64, width, height int, sigma, color float64) []float64 {
 	if len(data) != width*height {
 		panic("bilateral: data length does not match width*height")
 	}
 
-	radius := int(math.Ceil(3 * sigmaSpatial))
+	radius := int(math.Ceil(3 * sigma))
 	if radius < 1 {
 		radius = 1
 	}
 
 	windowSize := 2*radius + 1
 	spatialKernel := make([]float64, windowSize*windowSize)
-	twoSigmaSpatialSq := 2 * sigmaSpatial * sigmaSpatial
+	twoSigmaSpatialSq := 2 * sigma * sigma
 	for dy := -radius; dy <= radius; dy++ {
 		for dx := -radius; dx <= radius; dx++ {
 			d2 := float64(dx*dx + dy*dy)
@@ -32,7 +32,7 @@ func BilateralFilter(data []float64, width, height int, sigmaSpatial, sigmaRange
 
 	const lutSize = 1100
 	const rangeStep = 0.1
-	twoSigmaRangeSq := 2 * sigmaRange * sigmaRange
+	twoSigmaRangeSq := 2 * color * color
 	rangeLUT := make([]float64, lutSize)
 	for i := range rangeLUT {
 		diff := float64(i) * rangeStep

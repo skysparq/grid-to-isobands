@@ -36,10 +36,9 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 	}
 	args := &grid_to_isobands.IsobandArgs{
 		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(3, 5),
+			grid_to_isobands.BilateralTransformer(2, 5),
 			grid_to_isobands.CloseOpenTransformer(7),
-			grid_to_isobands.GaussianTransformer(9, 2.0),
-			grid_to_isobands.RemoveInfTransformer(),
+			grid_to_isobands.GaussianTransformer(7, 1.5),
 		},
 		Grid:  gridValues,
 		Floor: 5,
@@ -53,119 +52,159 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	isobandJson, err := json.Marshal(isobands)
+	err = saveTestOutput(isobands, `mrms-base-reflectivity.geojson`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile(`./test-output/mrms-base-reflectivity.geojson`, isobandJson, 0644)
+}
+
+func TestMrmsBaseReflectivity2(t *testing.T) {
+	testData, err := getTestData(`mrms-base-reflectivity-2.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.BilateralTransformer(2, 5),
+			grid_to_isobands.CloseOpenTransformer(7),
+			grid_to_isobands.GaussianTransformer(7, 1.5),
+		},
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
+		AddlProps: map[string]any{
+			`measure`: `base-reflectivity`,
+			`at`:      time.Date(2026, 1, 6, 17, 2, 0, 0, time.UTC),
+		},
+	}
+	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = saveTestOutput(isobands, `mrms-base-reflectivity-2.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMrmsKnoxTornadoBaseReflectivity(t *testing.T) {
+	testData, err := getTestData(`mrms-knox-tornado-base-reflectivity.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.BilateralTransformer(1, 2.5),
+			grid_to_isobands.CloseOpenTransformer(3),
+			grid_to_isobands.GaussianTransformer(5, 1.0),
+		},
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
+		AddlProps: map[string]any{
+			`measure`: `base-reflectivity`,
+			`at`:      time.Date(2026, 3, 11, 1, 10, 14, 0, time.UTC),
+		},
+	}
+	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = saveTestOutput(isobands, `mrms-knox-tornado-base-reflectivity.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMrmsCompositeReflectivity(t *testing.T) {
+	testData, err := getTestData(`mrms-composite-reflectivity.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.BilateralTransformer(2, 5),
+			grid_to_isobands.CloseOpenTransformer(7),
+			grid_to_isobands.GaussianTransformer(7, 1.5),
+		},
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
+		AddlProps: map[string]any{
+			`measure`: `composite-reflectivity`,
+			`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
+		},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `mrms-composite-reflectivity.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMrmsCompositeReflectivity2(t *testing.T) {
+	testData, err := getTestData(`mrms-composite-reflectivity-2.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.BilateralTransformer(2, 5),
+			grid_to_isobands.CloseOpenTransformer(7),
+			grid_to_isobands.GaussianTransformer(7, 1.5),
+		},
+		Grid:  gridValues,
+		Floor: 5,
+		Step:  2.5,
+		AddlProps: map[string]any{
+			`measure`: `composite-reflectivity`,
+			`at`:      time.Date(2026, 1, 7, 20, 30, 37, 0, time.UTC),
+		},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `mrms-composite-reflectivity-2.geojson`)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 /*
-	func TestMrmsBaseReflectivity2(t *testing.T) {
-		testData, err := getTestData(`mrms-base-reflectivity-2.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gridValues := grid_to_isobands.GridValues{
-			SizeX:  testData.SizeX,
-			SizeY:  testData.SizeY,
-			Lats:   testData.Lats,
-			Lons:   testData.Lngs,
-			Values: testData.Values,
-		}
-		args := grid_to_isobands.IsobandArgs{
-			Grid:  gridValues,
-			Floor: 5,
-			Step:  2.5,
-			AddlProps: map[string]any{
-				`measure`: `base-reflectivity`,
-				`at`:      time.Date(2026, 1, 6, 17, 2, 0, 0, time.UTC),
-			},
-			Tolerance: 1000,
-			Clip:      grid_to_isobands.Clip{Top: 1, Bottom: 1, Left: 1, Right: 1},
-		}
-		isogons, err := grid_to_isobands.IsobandsFromGrid(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = saveTestOutput(isogons, `base-reflectivity-2.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	func TestMrmsCompositeReflectivity(t *testing.T) {
-		testData, err := getTestData(`mrms-composite-reflectivity.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gridValues := grid_to_isobands.GridValues{
-			SizeX:  testData.SizeX,
-			SizeY:  testData.SizeY,
-			Lats:   testData.Lats,
-			Lons:   testData.Lngs,
-			Values: testData.Values,
-		}
-		args := grid_to_isobands.IsobandArgs{
-			Grid:  gridValues,
-			Floor: 5,
-			Step:  2.5,
-			AddlProps: map[string]any{
-				`measure`: `composite-reflectivity`,
-				`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
-			},
-			Tolerance: 1000,
-			Clip:      grid_to_isobands.Clip{Top: 1, Bottom: 1, Left: 1, Right: 1},
-		}
-		isogons, err := grid_to_isobands.IsobandsFromGrid(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = saveTestOutput(isogons, `composite-reflectivity.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	func TestMrmsCompositeReflectivity2(t *testing.T) {
-		testData, err := getTestData(`mrms-composite-reflectivity-2.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gridValues := grid_to_isobands.GridValues{
-			SizeX:  testData.SizeX,
-			SizeY:  testData.SizeY,
-			Lats:   testData.Lats,
-			Lons:   testData.Lngs,
-			Values: testData.Values,
-		}
-		args := grid_to_isobands.IsobandArgs{
-			Grid:  gridValues,
-			Floor: 5,
-			Step:  2.5,
-			AddlProps: map[string]any{
-				`measure`: `composite-reflectivity`,
-				`at`:      time.Date(2026, 1, 7, 20, 30, 37, 0, time.UTC),
-			},
-			Tolerance: 1000,
-			Clip:      grid_to_isobands.Clip{Top: 1, Bottom: 1, Left: 1, Right: 1},
-		}
-		isogons, err := grid_to_isobands.IsobandsFromGrid(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = saveTestOutput(isogons, `composite-reflectivity-2.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
 	func TestGfsBaroPressure(t *testing.T) {
 		testData, err := getTestData(`gfs-baro-pressure-msl.json`)
 		if err != nil {

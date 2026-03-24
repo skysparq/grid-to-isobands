@@ -19,6 +19,18 @@ type TestData struct {
 	Lats, Lngs, Values []float64
 }
 
+func TestGenerateKnoxTornadoBaseReflectivity(t *testing.T) {
+	t.Skip()
+	err := generateTestData(
+		"https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MergedBaseReflectivityQC_00.50/20260311/MRMS_MergedBaseReflectivityQC_00.50_20260311-011014.grib2.gz",
+		"mrms-knox-tornado-base-reflectivity.json",
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateBaseReflectivity(t *testing.T) {
 	t.Skip()
 	err := generateTestData(

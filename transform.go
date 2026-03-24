@@ -105,8 +105,8 @@ func RemoveInfTransformer() GridTransformer {
 	}
 }
 
-func BilateralTransformer(sigmaSpatial, sigmaRange float64) GridTransformer {
+func BilateralTransformer(sigma, color float64) GridTransformer {
 	return func(values *GridValues) {
-		values.Values = BilateralFilter(values.Values, values.SizeX, values.SizeY, sigmaSpatial, sigmaRange)
+		values.Values = BilateralFilter(values.Values, values.SizeX, values.SizeY, sigma, color)
 	}
 }
