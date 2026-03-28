@@ -78,7 +78,7 @@ func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
 		GridValues: args.Grid,
-		Levels:     GenerateLevels(args.Floor, slices.Max(args.Grid.Values), args.Step),
+		Levels:     GenerateLevels(args.Floor, slicesMaxNotNaN(args.Grid.Values), args.Step),
 	}
 
 	inPath := gridPath(jobId, args.WorkDir)
@@ -121,6 +121,22 @@ func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 	}
 	isobands.Properties = args.AddlProps
 	return isobands, nil
+}
+
+func slicesMaxNotNaN(s []float64) float64 {
+	maxVal := math.NaN()
+	for _, n := range s {
+		if math.IsNaN(n) {
+			continue
+		}
+		if math.IsNaN(maxVal) {
+			maxVal = n
+		}
+		if n > maxVal {
+			maxVal = n
+		}
+	}
+	return maxVal
 }
 
 func minMax(values []float64, floor float64) (float64, float64) {

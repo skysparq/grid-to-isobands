@@ -110,3 +110,7 @@ func BilateralTransformer(sigma, color float64) GridTransformer {
 		values.Values = BilateralFilter(values.Values, values.SizeX, values.SizeY, sigma, color)
 	}
 }
+
+func Downsample2x2Transformer() GridTransformer {
+	return Downsample2x2
+}
