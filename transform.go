@@ -1,6 +1,10 @@
 package grid_to_isobands
 
-import "math"
+import (
+	"math"
+
+	"github.com/skysparq/grid-to-isobands/transformers"
+)
 
 type GridTransformer func(values *GridValues)
 
@@ -58,40 +62,40 @@ func ReverseVerticalTransformer() GridTransformer {
 
 func OpenCloseTransformer(kernel int) GridTransformer {
 	return func(values *GridValues) {
-		morphOps := NewMorphologicalOps(values.SizeX, values.SizeY)
+		morphOps := transformers.NewMorphologicalOps(values.SizeX, values.SizeY)
 		values.Values = morphOps.OpenClose(values.Values, kernel)
 	}
 }
 
 func CloseOpenTransformer(kernel int) GridTransformer {
 	return func(values *GridValues) {
-		morphOps := NewMorphologicalOps(values.SizeX, values.SizeY)
+		morphOps := transformers.NewMorphologicalOps(values.SizeX, values.SizeY)
 		values.Values = morphOps.CloseOpen(values.Values, kernel)
 	}
 }
 
 func GaussianTransformer(kernel int, sigma float64) GridTransformer {
 	return func(values *GridValues) {
-		values.Values = FastGaussian(values.Values, values.SizeX, values.SizeY, kernel, sigma)
+		values.Values = transformers.FastGaussian(values.Values, values.SizeX, values.SizeY, kernel, sigma)
 	}
 }
 
 func MedianTransformer(kernel int) GridTransformer {
 	return func(values *GridValues) {
-		newValues, _ := MedianFilter(values.Values, values.SizeX, values.SizeY, kernel)
+		newValues, _ := transformers.MedianFilter(values.Values, values.SizeX, values.SizeY, kernel)
 		values.Values = newValues
 	}
 }
 
-func ClipTransformer(clip Clip) GridTransformer {
+func ClipTransformer(clip transformers.Clip) GridTransformer {
 	return func(values *GridValues) {
-		ClipGrid(values, clip)
+		transformers.ClipGrid(values.Values, values.SizeX, values.SizeY, clip)
 	}
 }
 
-func ThresholdMaskTransformer(f ThresholdFunc, replacement float64) GridTransformer {
+func ThresholdMaskTransformer(f transformers.ThresholdFunc, replacement float64) GridTransformer {
 	return func(values *GridValues) {
-		ThresholdMask(values.Values, f, replacement)
+		transformers.ThresholdMask(values.Values, f, replacement)
 	}
 }
 
@@ -107,10 +111,6 @@ func RemoveInfTransformer() GridTransformer {
 
 func BilateralTransformer(sigma, color float64) GridTransformer {
 	return func(values *GridValues) {
-		values.Values = BilateralFilter(values.Values, values.SizeX, values.SizeY, sigma, color)
+		values.Values = transformers.BilateralFilter(values.Values, values.SizeX, values.SizeY, sigma, color)
 	}
-}
-
-func Downsample2x2Transformer() GridTransformer {
-	return Downsample2x2
 }

@@ -1,4 +1,4 @@
-package grid_to_isobands
+package transformers
 
 import (
 	"fmt"

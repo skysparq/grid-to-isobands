@@ -10,6 +10,7 @@ import (
 	"time"
 
 	grid_to_isobands "github.com/skysparq/grid-to-isobands"
+	"github.com/skysparq/grid-to-isobands/transformers"
 )
 
 func TestGenerateLevels(t *testing.T) {
@@ -53,43 +54,6 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = saveTestOutput(isobands, `mrms-base-reflectivity.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestMrmsBaseReflectivityDownsampled(t *testing.T) {
-	testData, err := getTestData(`mrms-base-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(1, 2.5),
-			grid_to_isobands.CloseOpenTransformer(3),
-			grid_to_isobands.GaussianTransformer(5, 1.0),
-			grid_to_isobands.Downsample2x2Transformer(),
-		},
-		Grid:  gridValues,
-		Floor: 5,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `base-reflectivity`,
-			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
-		},
-	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = saveTestOutput(isobands, `mrms-base-reflectivity-downsampled.geojson`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +220,7 @@ func TestGfsBaroPressure(t *testing.T) {
 	args := &grid_to_isobands.IsobandArgs{
 		Preprocesses: []grid_to_isobands.GridTransformer{
 			grid_to_isobands.SwapRightAndLeftTransformer(),
-			grid_to_isobands.ClipTransformer(grid_to_isobands.Clip{
+			grid_to_isobands.ClipTransformer(transformers.Clip{
 				Top:    20,
 				Bottom: 20,
 				Left:   1,
@@ -320,43 +284,51 @@ func TestGfsBaroPressure(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	func TestSurfaceTemp(t *testing.T) {
-		testData, err := getTestData(`temperature-surface.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gridValues := grid_to_isobands.GridValues{
-			SizeX:  testData.SizeX,
-			SizeY:  testData.SizeY,
-			Lats:   testData.Lats,
-			Lons:   testData.Lngs,
-			Values: testData.Values,
-		}
-		args := grid_to_isobands.IsobandArgs{
-			Grid:             gridValues,
-			InitialTransform: grid_to_isobands.SwapRightAndLeft,
-			Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 40, Bottom: 40},
-			Floor:            0,
-			Step:             2,
-			AddlProps: map[string]any{
-				`measure`: `temperature-surface`,
-				`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
-			},
-			WorkDir:   "./tmp",
-			Tolerance: 5000,
-		}
-		isogons, err := grid_to_isobands.IsobandsFromGrid(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = saveTestOutput(isogons, `temperature-surface.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
+*/
+func TestSurfaceTemp(t *testing.T) {
+	testData, err := getTestData(`temperature-surface.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.SwapRightAndLeftTransformer(),
+			grid_to_isobands.ClipTransformer(transformers.Clip{
+				Top:    20,
+				Bottom: 20,
+				Left:   1,
+				Right:  1,
+			}),
+			grid_to_isobands.GaussianTransformer(7, 1),
+		},
+		Grid:  gridValues,
+		Floor: 0,
+		Step:  2,
+		AddlProps: map[string]any{
+			`measure`: `temperature-surface`,
+			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
+		},
+		WorkDir: "./tmp",
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	err = saveTestOutput(isogons, `temperature-surface.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+/*
 	func TestWindU(t *testing.T) {
 		testData, err := getTestData(`wind-u-100hpa.json`)
 		if err != nil {
@@ -392,43 +364,52 @@ func TestGfsBaroPressure(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	func TestVisibilitySurface(t *testing.T) {
-		testData, err := getTestData(`visibility-surface.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gridValues := grid_to_isobands.GridValues{
-			SizeX:  testData.SizeX,
-			SizeY:  testData.SizeY,
-			Lats:   testData.Lats,
-			Lons:   testData.Lngs,
-			Values: testData.Values,
-		}
-		args := grid_to_isobands.IsobandArgs{
-			Grid:             gridValues,
-			InitialTransform: grid_to_isobands.SwapRightAndLeft,
-			Clip:             grid_to_isobands.Clip{Left: 1, Right: 1, Top: 40, Bottom: 40},
-			Floor:            0,
-			Step:             2500,
-			AddlProps: map[string]any{
-				`measure`: `visibility-surface`,
-				`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
-			},
-			WorkDir:   "./tmp",
-			Tolerance: 5000,
-		}
-		isogons, err := grid_to_isobands.IsobandsFromGrid(args)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = saveTestOutput(isogons, `visibility-surface.json`)
-		if err != nil {
-			t.Fatal(err)
-		}
+*/
+func TestVisibilitySurface(t *testing.T) {
+	testData, err := getTestData(`visibility-surface.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.SwapRightAndLeftTransformer(),
+			grid_to_isobands.ClipTransformer(transformers.Clip{
+				Top:    20,
+				Bottom: 20,
+				Left:   1,
+				Right:  1,
+			}),
+			grid_to_isobands.BilateralTransformer(1, 2500),
+			grid_to_isobands.GaussianTransformer(3, 1.0),
+		},
+		Grid:  gridValues,
+		Floor: 0,
+		Step:  2500,
+		AddlProps: map[string]any{
+			`measure`: `visibility-surface`,
+			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
+		},
+		WorkDir: "./tmp",
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	err = saveTestOutput(isogons, `visibility-surface.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+/*
 	func TestReflectivityAtmosphere(t *testing.T) {
 		testData, err := getTestData(`reflectivity-atmosphere.json`)
 		if err != nil {

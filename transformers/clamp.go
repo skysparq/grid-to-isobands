@@ -1,4 +1,4 @@
-package grid_to_isobands
+package transformers
 
 func clamp(val, min, max int) int {
 	if val < min {
