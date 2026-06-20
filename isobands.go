@@ -39,13 +39,21 @@ type pyArgs struct {
 	Levels []float64
 }
 
-func IsobandsFromGrid(args *IsobandArgs) (*FeatureCollection, error) {
+type ReturnValues struct {
+	Isobands *FeatureCollection
+	Grid     *GridValues
+}
+
+func IsobandsFromGrid(args *IsobandArgs) (*ReturnValues, error) {
 	preprocessGrid(args)
 	isobands, err := toIsobands(args)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
-	return isobands, nil
+	return &ReturnValues{
+		Grid:     args.Grid,
+		Isobands: isobands,
+	}, nil
 }
 
 func preprocessArgs(args *IsobandArgs) {
