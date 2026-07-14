@@ -409,6 +409,49 @@ func TestVisibilitySurface(t *testing.T) {
 	}
 }
 
+func TestFailedGfsHumidity100hpa(t *testing.T) {
+	testData, err := getTestData(`failed-gfs-humidity-100hpa.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.SwapRightAndLeftTransformer(),
+			grid_to_isobands.GaussianTransformer(7, 1),
+			grid_to_isobands.ClipTransformer(transformers.Clip{
+				Top:    20,
+				Bottom: 20,
+				Left:   1,
+				Right:  1,
+			}),
+		},
+		Grid:  gridValues,
+		Floor: 0,
+		Step:  10,
+		AddlProps: map[string]any{
+			`measure`: `humidity-100hpa`,
+			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
+		},
+		WorkDir: "./tmp",
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `failed-gfs-humidity-100hpa.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 /*
 	func TestReflectivityAtmosphere(t *testing.T) {
 		testData, err := getTestData(`reflectivity-atmosphere.json`)
@@ -462,14 +505,14 @@ func getTestData(filename string) (TestData, error) {
 	return testData, nil
 }
 
-func saveTestOutput(isogons *grid_to_isobands.FeatureCollection, name string) error {
+func saveTestOutput(isogons *grid_to_isobands.ReturnValues, name string) error {
 	out, err := os.Create(filepath.Join(`./test-output`, name))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = out.Close() }()
 	encoder := json.NewEncoder(out)
-	err = encoder.Encode(isogons)
+	err = encoder.Encode(isogons.Isobands)
 	if err != nil {
 		return err
 	}

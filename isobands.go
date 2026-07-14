@@ -83,10 +83,14 @@ func GenerateLevels(start, stop, step float64) []float64 {
 
 func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 	preprocessArgs(args)
+	maxVal := slicesMaxNotNaN(args.Grid.Values)
+	if math.IsNaN(maxVal) {
+		return &FeatureCollection{Features: []Feature{}}, nil
+	}
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
 		GridValues: args.Grid,
-		Levels:     GenerateLevels(args.Floor, slicesMaxNotNaN(args.Grid.Values), args.Step),
+		Levels:     GenerateLevels(args.Floor, maxVal, args.Step),
 	}
 
 	inPath := gridPath(jobId, args.WorkDir)

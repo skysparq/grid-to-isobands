@@ -31,7 +31,10 @@ func gaussianKernel1D(size int, sigma float64) []float64 {
 	return kernel
 }
 
-// separableConvolve2D performs separable 2D convolution
+// separableConvolve2D performs separable 2D convolution, skipping NaN neighbors.
+// Each output pixel is computed from the weighted sum of non-NaN neighbors only,
+// with the kernel renormalized over those neighbors. Pixels with no valid neighbors
+// remain NaN.
 func separableConvolve2D(data *mat.Dense, kernel []float64) *mat.Dense {
 	rows, cols := data.Dims()
 	kSize := len(kernel)
@@ -41,12 +44,20 @@ func separableConvolve2D(data *mat.Dense, kernel []float64) *mat.Dense {
 	temp := mat.NewDense(rows, cols, nil)
 	for i := 0; i < rows; i++ {
 		for j := 0; j < cols; j++ {
-			sum := 0.0
+			sum, weight := 0.0, 0.0
 			for k := 0; k < kSize; k++ {
 				srcJ := clamp(j+k-kHalf, 0, cols-1)
-				sum += kernel[k] * data.At(i, srcJ)
+				v := data.At(i, srcJ)
+				if !math.IsNaN(v) {
+					sum += kernel[k] * v
+					weight += kernel[k]
+				}
 			}
-			temp.Set(i, j, sum)
+			if weight == 0 {
+				temp.Set(i, j, math.NaN())
+			} else {
+				temp.Set(i, j, sum/weight)
+			}
 		}
 	}
 
@@ -54,12 +65,20 @@ func separableConvolve2D(data *mat.Dense, kernel []float64) *mat.Dense {
 	result := mat.NewDense(rows, cols, nil)
 	for i := 0; i < rows; i++ {
 		for j := 0; j < cols; j++ {
-			sum := 0.0
+			sum, weight := 0.0, 0.0
 			for k := 0; k < kSize; k++ {
 				srcI := clamp(i+k-kHalf, 0, rows-1)
-				sum += kernel[k] * temp.At(srcI, j)
+				v := temp.At(srcI, j)
+				if !math.IsNaN(v) {
+					sum += kernel[k] * v
+					weight += kernel[k]
+				}
 			}
-			result.Set(i, j, sum)
+			if weight == 0 {
+				result.Set(i, j, math.NaN())
+			} else {
+				result.Set(i, j, sum/weight)
+			}
 		}
 	}
 

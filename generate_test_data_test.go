@@ -151,6 +151,17 @@ func TestGenerateBaroPressureMsl2(t *testing.T) {
 	}
 }
 
+func TestGenerateFailedGfsHumidity100hpa(t *testing.T) {
+	err := generateTestData(
+		`https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20250906/00/atmos/gfs.t00z.pgrb2.0p25.f001`,
+		`failed-gfs-humidity-100hpa.json`,
+		223,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generateTestData(url string, dest string, index int) error {
 	err := os.MkdirAll(`./.test_files`, 0755)
 	if err != nil {

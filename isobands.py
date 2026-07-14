@@ -24,6 +24,8 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
         if filled:
             # Parse the filled output: list of chunks, each chunk has points and offsets
             for points, boundary_offsets, poly_offsets in zip(*filled):
+                if points is None:
+                    continue
                 transf_points = []
                 for j in range(len(points)):
                     point = points[j]
@@ -40,7 +42,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                     if point[1] < -89.99999:
                         point = point[0], -89.99999
 
-                    transf_points.append(point.tolist())
+                    transf_points.append(list(point))
 
                 boundaries = []
                 for j in range(len(boundary_offsets) - 1):
