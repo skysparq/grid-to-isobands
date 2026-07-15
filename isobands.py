@@ -82,10 +82,13 @@ if __name__ == '__main__':
 
     rows = data['SizeY']
     cols = data['SizeX']
-    vals = np.array(data['Values'])
-    lats = np.array(data['Lats'])
-    lons = np.array(data['Lons'])
+    # Values/Lats/Lons now arrive as packed little-endian float64 byte strings rather than CBOR
+    # arrays, so np.frombuffer wraps them directly with no intermediate Python list of boxed floats.
+    vals = np.frombuffer(data['Values'], dtype='<f8')
+    lats = np.frombuffer(data['Lats'], dtype='<f8')
+    lons = np.frombuffer(data['Lons'], dtype='<f8')
     levels = np.array(data['Levels'])
+    del data
 
     isobands = grid_to_isobands(vals, lats, lons, cols, rows, levels)
 

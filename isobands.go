@@ -3,6 +3,7 @@ package grid_to_isobands
 import (
 	"bytes"
 	_ "embed"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -34,9 +35,30 @@ type IsobandArgs struct {
 	WorkDir      string
 }
 
+// pyArgs is the wire format sent to the Python isoband-generation subprocess.
+// Values, Lats, and Lons are packed as raw little-endian float64 bytes (see
+// packFloat64) instead of CBOR arrays, so the Python side reads them directly
+// into numpy via np.frombuffer rather than decoding a Python list of boxed
+// floats first. For large grids (tens of millions of points), that
+// intermediate list roughly doubles peak memory in the subprocess before any
+// contouring work even starts.
 type pyArgs struct {
-	*GridValues
+	SizeX  int
+	SizeY  int
+	Values []byte
+	Lats   []byte
+	Lons   []byte
 	Levels []float64
+}
+
+// packFloat64 packs a []float64 into a little-endian byte buffer for the
+// CBOR byte-string wire format used by pyArgs.
+func packFloat64(values []float64) []byte {
+	buf := make([]byte, len(values)*8)
+	for i, v := range values {
+		binary.LittleEndian.PutUint64(buf[i*8:], math.Float64bits(v))
+	}
+	return buf
 }
 
 type ReturnValues struct {
@@ -89,8 +111,12 @@ func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 	}
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
-		GridValues: args.Grid,
-		Levels:     GenerateLevels(args.Floor, maxVal, args.Step),
+		SizeX:  args.Grid.SizeX,
+		SizeY:  args.Grid.SizeY,
+		Values: packFloat64(args.Grid.Values),
+		Lats:   packFloat64(args.Grid.Lats),
+		Lons:   packFloat64(args.Grid.Lons),
+		Levels: GenerateLevels(args.Floor, maxVal, args.Step),
 	}
 
 	inPath := gridPath(jobId, args.WorkDir)
