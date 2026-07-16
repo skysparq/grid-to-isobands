@@ -30,7 +30,6 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                 for j in range(len(points)):
                     point = points[j]
                     if not (math.isfinite(point[0]) and math.isfinite(point[1])):
-                        print(f'got inf or nan at level {i} point {j}')
                         continue
 
                     if point[0] < -179.99999:

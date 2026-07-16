@@ -259,21 +259,24 @@ func execCmd(name string, args ...string) error {
 		return err
 	}
 
-	// Write the script
-	if _, err := stdin.Write(pyScript); err != nil {
-		_ = stdin.Close()
-		_ = cmd.Process.Kill() // best-effort
-		return err
-	}
+	writeErr := func() error {
+		if _, err := stdin.Write(pyScript); err != nil {
+			return err
+		}
+		return stdin.Close() // sends EOF to Python
+	}()
 
-	_ = stdin.Close() // ← This sends EOF to Python → crucial!
+	if writeErr != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait() // reap regardless -- prevents a zombie + a leaked goroutine
+		return fmt.Errorf("error writing script to stdin: %w", writeErr)
+	}
 
 	if err = cmd.Wait(); err != nil {
 		return fmt.Errorf("error executing %v: %w\nstderr: %s\nstdout: %s",
 			name, err, stdErr.String(), stdOut.String())
 	}
 
-	// Optionally: check stdOut / process output here if needed
 	return nil
 }
 
