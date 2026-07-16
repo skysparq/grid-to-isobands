@@ -2,6 +2,7 @@ package grid_to_isobands
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/binary"
 	"encoding/json"
@@ -66,9 +67,9 @@ type ReturnValues struct {
 	Grid     *GridValues
 }
 
-func IsobandsFromGrid(args *IsobandArgs) (*ReturnValues, error) {
+func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, error) {
 	preprocessGrid(args)
-	isobands, err := toIsobands(args)
+	isobands, err := toIsobands(ctx, args)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
@@ -103,7 +104,7 @@ func GenerateLevels(start, stop, step float64) []float64 {
 	return levels
 }
 
-func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
+func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, error) {
 	preprocessArgs(args)
 	maxVal := slicesMaxNotNaN(args.Grid.Values)
 	if math.IsNaN(maxVal) {
@@ -134,7 +135,7 @@ func toIsobands(args *IsobandArgs) (*FeatureCollection, error) {
 
 	outPath := isobandPath(jobId, args.WorkDir)
 
-	err = execCmd(`python3`, inPath, outPath)
+	err = execCmd(ctx, `python3`, inPath, outPath)
 	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
@@ -240,12 +241,12 @@ func maxFloor(floor, val1, val2 float64) float64 {
 	return val2
 }
 
-func execCmd(name string, args ...string) error {
+func execCmd(ctx context.Context, name string, args ...string) error {
 	stdErr := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 	stdOut := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 
 	fullArgs := append([]string{"-"}, args...)
-	cmd := exec.Command(name, fullArgs...)
+	cmd := exec.CommandContext(ctx, name, fullArgs...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
