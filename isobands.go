@@ -145,6 +145,7 @@ func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, err
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to open isobands: %w", err)
 	}
+	defer func() { _ = banded.Close() }()
 
 	decoder := json.NewDecoder(banded)
 	isobands := &FeatureCollection{}

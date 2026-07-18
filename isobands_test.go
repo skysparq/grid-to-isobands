@@ -1,6 +1,7 @@
 package grid_to_isobands_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,7 +50,7 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
 		},
 	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
+	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +86,7 @@ func TestMrmsBaseReflectivity2(t *testing.T) {
 			`at`:      time.Date(2026, 1, 6, 17, 2, 0, 0, time.UTC),
 		},
 	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
+	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +122,7 @@ func TestMrmsKnoxTornadoBaseReflectivity(t *testing.T) {
 			`at`:      time.Date(2026, 3, 11, 1, 10, 14, 0, time.UTC),
 		},
 	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(args)
+	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +158,7 @@ func TestMrmsCompositeReflectivity(t *testing.T) {
 			`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
 		},
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +195,7 @@ func TestMrmsCompositeReflectivity2(t *testing.T) {
 			`at`:      time.Date(2026, 1, 7, 20, 30, 37, 0, time.UTC),
 		},
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +238,7 @@ func TestGfsBaroPressure(t *testing.T) {
 		},
 		WorkDir: "./tmp",
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +318,7 @@ func TestSurfaceTemp(t *testing.T) {
 		},
 		WorkDir: "./tmp",
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +399,7 @@ func TestVisibilitySurface(t *testing.T) {
 		},
 		WorkDir: "./tmp",
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +442,7 @@ func TestFailedGfsHumidity100hpa(t *testing.T) {
 		},
 		WorkDir: "./tmp",
 	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(args)
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
 	}
