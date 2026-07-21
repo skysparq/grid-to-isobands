@@ -4,6 +4,32 @@ import sys
 import cbor2
 import numpy as np
 import contourpy
+from shapely.geometry import Polygon
+from shapely.geometry.polygon import orient
+from shapely.validation import make_valid
+
+
+def polygon_geoms(geom):
+    # Flatten a (possibly repaired) geometry down to its Polygon components.
+    # make_valid on a self-intersecting Polygon commonly returns a
+    # MultiPolygon (e.g. a bowtie splits into two disjoint pieces), and can
+    # rarely return a GeometryCollection mixing polygons with lower-dimension
+    # leftovers (stray points/lines) that aren't meaningful isobands.
+    if geom.is_empty:
+        return
+    if geom.geom_type == "Polygon":
+        yield geom
+    elif geom.geom_type in ("MultiPolygon", "GeometryCollection"):
+        for part in geom.geoms:
+            yield from polygon_geoms(part)
+
+
+def polygon_to_rings(polygon):
+    # orient() enforces the GeoJSON right-hand-rule convention (CCW shell,
+    # CW holes), which repaired/reassembled polygons don't otherwise guarantee.
+    polygon = orient(polygon, sign=1.0)
+    rings = [polygon.exterior] + list(polygon.interiors)
+    return [[list(point) for point in ring.coords] for ring in rings]
 
 
 def ring_area(ring):
@@ -57,19 +83,25 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                     rings = boundaries[start:end]
                     if not rings or not rings[0]:
                         continue
-                    poly = [rings[0]] + [ring for ring in rings[1:] if ring]
-                    features.append({
-                        "type": "Feature",
-                        "properties": {
-                            "levelIndex": i,
-                            "floor": lower,
-                            "ceiling": upper,
-                        },
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": poly,
-                        }
-                    })
+                    shell, *holes = [rings[0]] + [ring for ring in rings[1:] if ring]
+                    candidate = Polygon(shell, holes)
+                    # make_valid is relatively expensive, so only pay for it
+                    # when contourpy has actually produced a self-intersecting
+                    # (or otherwise invalid) ring -- the common case is valid.
+                    repaired = candidate if candidate.is_valid else make_valid(candidate)
+                    for polygon in polygon_geoms(repaired):
+                        features.append({
+                            "type": "Feature",
+                            "properties": {
+                                "levelIndex": i,
+                                "floor": lower,
+                                "ceiling": upper,
+                            },
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": polygon_to_rings(polygon),
+                            }
+                        })
     return {
         "type": "FeatureCollection",
         "features": features
