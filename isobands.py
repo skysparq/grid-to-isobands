@@ -1,5 +1,4 @@
 import json
-import math
 import sys
 
 import cbor2
@@ -26,34 +25,25 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
             for points, boundary_offsets, poly_offsets in zip(*filled):
                 if points is None:
                     continue
-                transf_points = []
-                for j in range(len(points)):
-                    point = points[j]
-                    if not (math.isfinite(point[0]) and math.isfinite(point[1])):
-                        continue
+                transf_points = [list(point) for point in points]
 
-                    if point[0] < -179.99999:
-                        point = -179.99999, point[1]
-                    if point[0] > 179.99999:
-                        point = 179.99999, point[1]
-                    if point[1] > 89.99999:
-                        point = point[0], 89.99999
-                    if point[1] < -89.99999:
-                        point = point[0], -89.99999
-
-                    transf_points.append(list(point))
-
+                # boundaries stays index-aligned with boundary_offsets: rings with too
+                # few points become an empty placeholder rather than being skipped,
+                # since poly_offsets indexes into this list positionally.
                 boundaries = []
                 for j in range(len(boundary_offsets) - 1):
                     start = boundary_offsets[j]
                     end = boundary_offsets[j + 1]
-                    if end - start < 4:
-                        continue
-                    boundaries.append(transf_points[start:end])
+                    ring = transf_points[start:end]
+                    boundaries.append(ring if len(ring) >= 4 else [])
+
                 for j in range(len(poly_offsets) - 1):
                     start = poly_offsets[j]
                     end = poly_offsets[j + 1]
-                    poly = boundaries[start:end]
+                    rings = boundaries[start:end]
+                    if not rings or not rings[0]:
+                        continue
+                    poly = [rings[0]] + [ring for ring in rings[1:] if ring]
                     features.append({
                         "type": "Feature",
                         "properties": {
