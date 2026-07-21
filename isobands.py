@@ -4,6 +4,7 @@ import sys
 import cbor2
 import numpy as np
 import contourpy
+import shapely
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
 from shapely.validation import make_valid
@@ -30,29 +31,6 @@ def polygon_to_rings(polygon):
     polygon = orient(polygon, sign=1.0)
     rings = [polygon.exterior] + list(polygon.interiors)
     return [[list(point) for point in ring.coords] for ring in rings]
-
-
-def dedupe_consecutive(points, tol=1e-9):
-    # quad_as_tri routinely emits the same point twice in a row wherever a
-    # filled boundary runs along a straight grid edge shared by two adjacent
-    # quads (each quad's triangle boundary independently emits the shared
-    # point). A repeated point is a zero-length edge, which S2 rejects as
-    # crossing its (real) neighboring edge.
-    #
-    # The two "duplicate" points aren't guaranteed to be bit-identical: each
-    # quad interpolates its own copy of the shared point from the same corner
-    # values, and floating-point rounding can differ between the two
-    # independent computations even though they represent the same true
-    # location (they can print identically at 6 decimal places and still
-    # fail strict equality). Compare within a tolerance instead. 1e-9 degrees
-    # is many orders of magnitude below both real grid spacing and typical
-    # float64 interpolation noise, so it only catches true duplicates.
-    deduped = points[:1]
-    for point in points[1:]:
-        prev = deduped[-1]
-        if abs(point[0] - prev[0]) > tol or abs(point[1] - prev[1]) > tol:
-            deduped.append(point)
-    return deduped
 
 
 def ring_area(ring):
@@ -97,7 +75,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                 for j in range(len(boundary_offsets) - 1):
                     start = boundary_offsets[j]
                     end = boundary_offsets[j + 1]
-                    ring = dedupe_consecutive(transf_points[start:end])
+                    ring = transf_points[start:end]
                     boundaries.append(ring if len(ring) >= 4 and ring_area(ring) > 1e-9 else [])
 
                 for j in range(len(poly_offsets) - 1):
@@ -111,8 +89,22 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                     # make_valid is relatively expensive, so only pay for it
                     # when contourpy has actually produced a self-intersecting
                     # (or otherwise invalid) ring -- the common case is valid.
+                    # set_precision's docs warn results are unexpected on
+                    # invalid input, so validity must be repaired first.
                     repaired = candidate if candidate.is_valid else make_valid(candidate)
-                    for polygon in polygon_geoms(repaired):
+                    # quad_as_tri routinely emits the same point twice where a
+                    # filled boundary runs along a grid edge shared by two
+                    # adjacent triangles -- a zero-length edge that GEOS
+                    # doesn't consider invalid (is_valid is True either way)
+                    # but that S2 rejects as crossing its real neighboring
+                    # edge. set_precision's own topology rebuild collapses
+                    # these (and any other near-duplicate vertices) into a
+                    # guaranteed-valid result, unlike a hand-rolled per-point
+                    # distance check, which can silently merge two distinct,
+                    # legitimately close vertices and introduce a *new*
+                    # self-intersection instead of removing one.
+                    cleaned = shapely.set_precision(repaired, grid_size=1e-9)
+                    for polygon in polygon_geoms(cleaned):
                         features.append({
                             "type": "Feature",
                             "properties": {
