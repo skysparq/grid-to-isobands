@@ -6,6 +6,20 @@ import numpy as np
 import contourpy
 
 
+def ring_area(ring):
+    # Shoelace formula. Used to catch rings that have enough points to pass the
+    # length check but are geometrically degenerate (e.g. a pinch point where
+    # marching squares revisits the same spot), which S2/Snowflake reject as
+    # "empty loops" even though they're valid, non-empty GeoJSON coordinates.
+    area = 0.0
+    n = len(ring)
+    for i in range(n):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % n]
+        area += x1 * y2 - x2 * y1
+    return abs(area) / 2.0
+
+
 def grid_to_isobands(values, lats, lons, nx, ny, levels):
     xi_grid = np.reshape(lons, (ny, nx))
     yi_grid = np.reshape(lats, (ny, nx))
@@ -35,7 +49,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                     start = boundary_offsets[j]
                     end = boundary_offsets[j + 1]
                     ring = transf_points[start:end]
-                    boundaries.append(ring if len(ring) >= 4 else [])
+                    boundaries.append(ring if len(ring) >= 4 and ring_area(ring) > 1e-9 else [])
 
                 for j in range(len(poly_offsets) - 1):
                     start = poly_offsets[j]
