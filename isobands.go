@@ -69,6 +69,9 @@ type ReturnValues struct {
 
 func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, error) {
 	preprocessGrid(args)
+	if err := validateLonsMonotonic(args.Grid); err != nil {
+		return nil, fmt.Errorf("error generating isobands: %w", err)
+	}
 	isobands, err := toIsobands(ctx, args)
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
@@ -77,6 +80,38 @@ func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, er
 		Grid:     args.Grid,
 		Isobands: isobands,
 	}, nil
+}
+
+// validateLonsMonotonic checks that each row of the grid's longitude values is
+// either strictly increasing or strictly decreasing all the way across.
+// contourpy requires monotonic x-coordinates; a non-monotonic row (typically
+// caused by a global 0-360 grid that was never rotated onto a -180..180
+// layout, e.g. a missing SwapRightAndLeftTransformer) produces silently
+// invalid, self-intersecting geometry instead of a usable error.
+func validateLonsMonotonic(grid *GridValues) error {
+	width := grid.SizeX
+	for row := 0; row < grid.SizeY; row++ {
+		rowStart := row * width
+		increasing, decreasing := true, true
+		for col := 1; col < width; col++ {
+			prev := grid.Lons[rowStart+col-1]
+			cur := grid.Lons[rowStart+col]
+			if cur < prev {
+				increasing = false
+			}
+			if cur > prev {
+				decreasing = false
+			}
+			if !increasing && !decreasing {
+				return fmt.Errorf(
+					"grid longitude values are not monotonic in row %d at column %d (%.6f -> %.6f); "+
+						"this usually means a required preprocessing step (e.g. SwapRightAndLeftTransformer) "+
+						"was not applied before calling IsobandsFromGrid",
+					row, col, prev, cur)
+			}
+		}
+	}
+	return nil
 }
 
 func preprocessArgs(args *IsobandArgs) {
