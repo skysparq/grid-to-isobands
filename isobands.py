@@ -32,15 +32,25 @@ def polygon_to_rings(polygon):
     return [[list(point) for point in ring.coords] for ring in rings]
 
 
-def dedupe_consecutive(points):
+def dedupe_consecutive(points, tol=1e-9):
     # quad_as_tri routinely emits the same point twice in a row wherever a
     # filled boundary runs along a straight grid edge shared by two adjacent
     # quads (each quad's triangle boundary independently emits the shared
     # point). A repeated point is a zero-length edge, which S2 rejects as
     # crossing its (real) neighboring edge.
+    #
+    # The two "duplicate" points aren't guaranteed to be bit-identical: each
+    # quad interpolates its own copy of the shared point from the same corner
+    # values, and floating-point rounding can differ between the two
+    # independent computations even though they represent the same true
+    # location (they can print identically at 6 decimal places and still
+    # fail strict equality). Compare within a tolerance instead. 1e-9 degrees
+    # is many orders of magnitude below both real grid spacing and typical
+    # float64 interpolation noise, so it only catches true duplicates.
     deduped = points[:1]
     for point in points[1:]:
-        if point != deduped[-1]:
+        prev = deduped[-1]
+        if abs(point[0] - prev[0]) > tol or abs(point[1] - prev[1]) > tol:
             deduped.append(point)
     return deduped
 
