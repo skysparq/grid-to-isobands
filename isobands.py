@@ -32,6 +32,19 @@ def polygon_to_rings(polygon):
     return [[list(point) for point in ring.coords] for ring in rings]
 
 
+def dedupe_consecutive(points):
+    # quad_as_tri routinely emits the same point twice in a row wherever a
+    # filled boundary runs along a straight grid edge shared by two adjacent
+    # quads (each quad's triangle boundary independently emits the shared
+    # point). A repeated point is a zero-length edge, which S2 rejects as
+    # crossing its (real) neighboring edge.
+    deduped = points[:1]
+    for point in points[1:]:
+        if point != deduped[-1]:
+            deduped.append(point)
+    return deduped
+
+
 def ring_area(ring):
     # Shoelace formula. Used to catch rings that have enough points to pass the
     # length check but are geometrically degenerate (e.g. a pinch point where
@@ -74,7 +87,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                 for j in range(len(boundary_offsets) - 1):
                     start = boundary_offsets[j]
                     end = boundary_offsets[j + 1]
-                    ring = transf_points[start:end]
+                    ring = dedupe_consecutive(transf_points[start:end])
                     boundaries.append(ring if len(ring) >= 4 and ring_area(ring) > 1e-9 else [])
 
                 for j in range(len(poly_offsets) - 1):
