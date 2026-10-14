@@ -59,6 +59,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
     for i in range(len(levels) - 1):
         lower = levels[i]
         upper = levels[i + 1]
+        nominal = lower + ((upper - lower)) / 2)
         filled = cont_gen.filled(lower, upper)
 
         if filled:
@@ -111,6 +112,7 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                                 "levelIndex": i,
                                 "floor": lower,
                                 "ceiling": upper,
+                                "nominal": nominal
                             },
                             "geometry": {
                                 "type": "Polygon",
