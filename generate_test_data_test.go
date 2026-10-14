@@ -162,6 +162,39 @@ func TestGenerateFailedGfsHumidity100hpa(t *testing.T) {
 	}
 }
 
+func TestGenerateMultiSensorQpe(t *testing.T) {
+	err := generateTestData(
+		`https://noaa-mrms-pds.s3.amazonaws.com/CONUS/MultiSensor_QPE_01H_Pass2_00.00/20260805/MRMS_MultiSensor_QPE_01H_Pass2_00.00_20260805-020000.grib2.gz`,
+		`multi-sensor-qpe.json`,
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGeneratePrecipFlag(t *testing.T) {
+	err := generateTestData(
+		`https://noaa-mrms-pds.s3.amazonaws.com/CONUS/PrecipFlag_00.00/20260805/MRMS_PrecipFlag_00.00_20260805-000200.grib2.gz`,
+		`precip-flag.json`,
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGeneratePrecipRate(t *testing.T) {
+	err := generateTestData(
+		`https://noaa-mrms-pds.s3.amazonaws.com/CONUS/PrecipRate_00.00/20260805/MRMS_PrecipRate_00.00_20260805-000200.grib2.gz`,
+		`precip-rate.json`,
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generateTestData(url string, dest string, index int) error {
 	err := os.MkdirAll(`./.test_files`, 0755)
 	if err != nil {

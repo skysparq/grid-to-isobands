@@ -169,6 +169,108 @@ func TestMrmsCompositeReflectivity(t *testing.T) {
 	}
 }
 
+func TestMrmsMultiSensorQpe(t *testing.T) {
+	testData, err := getTestData(`multi-sensor-qpe.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{},
+		Grid:         gridValues,
+		Levels:       []float64{0.25, 1, 2.5, 5, 10, 15, 25, 40, 50, 75, 100, 150, 1000},
+		AddlProps: map[string]any{
+			`measure`: `qpe`,
+			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+		},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `qpe.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMrmsPrecipRate(t *testing.T) {
+	testData, err := getTestData(`precip-rate.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
+			grid_to_isobands.MedianTransformer(3),
+			grid_to_isobands.GaussianTransformer(5, 0.7),
+		},
+		Grid:   gridValues,
+		Levels: []float64{0.1, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 10000},
+		AddlProps: map[string]any{
+			`measure`: `precip-rate`,
+			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+		},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `precip-rate.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMrmsPrecipFlag(t *testing.T) {
+	testData, err := getTestData(`precip-flag.json`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gridValues := &grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Preprocesses: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
+		},
+		Grid:   gridValues,
+		Levels: []float64{0.5, 1.5, 2.5, 3.5, 5.5, 6.5, 7.5, 9.5, 10.5, 90.5, 91.5, 95.5, 96.5},
+		AddlProps: map[string]any{
+			`measure`: `precip-flag`,
+			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+		},
+	}
+	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = saveTestOutput(isogons, `precip-flag.geojson`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMrmsCompositeReflectivity2(t *testing.T) {
 	testData, err := getTestData(`mrms-composite-reflectivity-2.json`)
 	if err != nil {

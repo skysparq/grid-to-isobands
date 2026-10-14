@@ -32,8 +32,11 @@ type IsobandArgs struct {
 	Grid         *GridValues
 	Preprocesses []GridTransformer
 	Floor, Step  float64
-	AddlProps    map[string]any
-	WorkDir      string
+	// Levels, if provided, is used as-is instead of generating levels from
+	// Floor and Step.
+	Levels    []float64
+	AddlProps map[string]any
+	WorkDir   string
 }
 
 // pyArgs is the wire format sent to the Python isoband-generation subprocess.
@@ -80,10 +83,13 @@ func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, er
 }
 
 func preprocessArgs(args *IsobandArgs) {
-	grid, floor, step := args.Grid, args.Floor, args.Step
 	if args.WorkDir == "" {
 		args.WorkDir = `./tmp`
 	}
+	if len(args.Levels) > 0 {
+		return
+	}
+	grid, floor, step := args.Grid, args.Floor, args.Step
 	floor = math.Floor(sliceMinFromFloor(grid.Values, floor)/step) * step
 	args.Floor = floor
 }
@@ -110,6 +116,11 @@ func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, err
 	if math.IsNaN(maxVal) {
 		return &FeatureCollection{Features: []Feature{}}, nil
 	}
+	levels := args.Levels
+	if len(levels) == 0 {
+		levels = GenerateLevels(args.Floor, maxVal, args.Step)
+	}
+
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
 		SizeX:  args.Grid.SizeX,
@@ -117,7 +128,7 @@ func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, err
 		Values: packFloat64(args.Grid.Values),
 		Lats:   packFloat64(args.Grid.Lats),
 		Lons:   packFloat64(args.Grid.Lons),
-		Levels: GenerateLevels(args.Floor, maxVal, args.Step),
+		Levels: levels,
 	}
 
 	inPath := gridPath(jobId, args.WorkDir)
