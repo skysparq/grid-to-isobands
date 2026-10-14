@@ -190,12 +190,7 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: failed to decode isobands: %w", err)
 	}
-	for i, feature := range isobands.Features {
-		if feature.Geometry.Coordinates == nil {
-			slices.Delete(isobands.Features, i, i+1)
-			i--
-		}
-	}
+	isobands.Features = slices.DeleteFunc(isobands.Features, func(f Feature) bool { return f.Geometry.Coordinates == nil })
 	isobands.Properties = args.AddlProps
 	return isobands, nil
 }
