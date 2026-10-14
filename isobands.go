@@ -29,9 +29,16 @@ type GridValues struct {
 }
 
 type IsobandArgs struct {
-	Grid         *GridValues
+	Grid *GridValues
+	// Preprocesses clean up the grid itself: they're applied to Grid in place, and the result
+	// is returned as ReturnValues.Grid.
 	Preprocesses []GridTransformer
-	Floor, Step  float64
+	// Selections choose which isobands are output without changing the grid: they run after
+	// Preprocesses on a copy of Grid's Values that only the contouring sees. Lats and Lons are
+	// shared with Grid rather than copied, so a selection must only change values, never
+	// reorder points.
+	Selections  []GridTransformer
+	Floor, Step float64
 	// Levels, if provided, is used as-is instead of generating levels from
 	// Floor and Step.
 	Levels    []float64
@@ -72,7 +79,7 @@ type ReturnValues struct {
 
 func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, error) {
 	preprocessGrid(args)
-	isobands, err := toIsobands(ctx, args)
+	isobands, err := toIsobands(ctx, args, selectGrid(args))
 	if err != nil {
 		return nil, fmt.Errorf("error generating isobands: %w", err)
 	}
@@ -82,14 +89,14 @@ func IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*ReturnValues, er
 	}, nil
 }
 
-func preprocessArgs(args *IsobandArgs) {
+func preprocessArgs(args *IsobandArgs, grid *GridValues) {
 	if args.WorkDir == "" {
 		args.WorkDir = `./tmp`
 	}
 	if len(args.Levels) > 0 {
 		return
 	}
-	grid, floor, step := args.Grid, args.Floor, args.Step
+	floor, step := args.Floor, args.Step
 	floor = math.Floor(sliceMinFromFloor(grid.Values, floor)/step) * step
 	args.Floor = floor
 }
@@ -98,6 +105,25 @@ func preprocessGrid(args *IsobandArgs) {
 	for _, preprocess := range args.Preprocesses {
 		preprocess(args.Grid)
 	}
+}
+
+// selectGrid returns the grid to contour: Grid itself when there are no Selections, otherwise
+// a copy of its values with Selections applied, so Grid is left as Preprocesses produced it.
+func selectGrid(args *IsobandArgs) *GridValues {
+	if len(args.Selections) == 0 {
+		return args.Grid
+	}
+	selected := &GridValues{
+		SizeX:  args.Grid.SizeX,
+		SizeY:  args.Grid.SizeY,
+		Values: slices.Clone(args.Grid.Values),
+		Lats:   args.Grid.Lats,
+		Lons:   args.Grid.Lons,
+	}
+	for _, selection := range args.Selections {
+		selection(selected)
+	}
+	return selected
 }
 
 func GenerateLevels(start, stop, step float64) []float64 {
@@ -110,9 +136,9 @@ func GenerateLevels(start, stop, step float64) []float64 {
 	return levels
 }
 
-func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, error) {
-	preprocessArgs(args)
-	maxVal := slicesMaxNotNaN(args.Grid.Values)
+func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*FeatureCollection, error) {
+	preprocessArgs(args, grid)
+	maxVal := slicesMaxNotNaN(grid.Values)
 	if math.IsNaN(maxVal) {
 		return &FeatureCollection{Features: []Feature{}}, nil
 	}
@@ -123,11 +149,11 @@ func toIsobands(ctx context.Context, args *IsobandArgs) (*FeatureCollection, err
 
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
-		SizeX:  args.Grid.SizeX,
-		SizeY:  args.Grid.SizeY,
-		Values: packFloat64(args.Grid.Values),
-		Lats:   packFloat64(args.Grid.Lats),
-		Lons:   packFloat64(args.Grid.Lons),
+		SizeX:  grid.SizeX,
+		SizeY:  grid.SizeY,
+		Values: packFloat64(grid.Values),
+		Lats:   packFloat64(grid.Lats),
+		Lons:   packFloat64(grid.Lons),
 		Levels: levels,
 	}
 

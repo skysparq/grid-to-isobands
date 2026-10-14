@@ -621,3 +621,43 @@ func saveTestOutput(isogons *grid_to_isobands.ReturnValues, name string) error {
 	}
 	return nil
 }
+
+func TestSelectionsOnlyAffectIsobands(t *testing.T) {
+	const size = 20
+	values := make([]float64, 0, size*size)
+	lats := make([]float64, 0, size*size)
+	lons := make([]float64, 0, size*size)
+	for row := 0; row < size; row++ {
+		for col := 0; col < size; col++ {
+			values = append(values, float64(row*size+col)*25)
+			lats = append(lats, 40-float64(row)*0.1)
+			lons = append(lons, -100+float64(col)*0.1)
+		}
+	}
+	original := slices.Clone(values)
+
+	args := &grid_to_isobands.IsobandArgs{
+		Grid: &grid_to_isobands.GridValues{SizeX: size, SizeY: size, Values: values, Lats: lats, Lons: lons},
+		Selections: []grid_to_isobands.GridTransformer{
+			grid_to_isobands.ThresholdMaskTransformer(transformers.GreaterThan(3000), 3150),
+		},
+		Floor: 0,
+		Step:  150,
+	}
+	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(result.Grid.Values, original) {
+		t.Fatal(`expected selections to leave the returned grid unchanged`)
+	}
+	if len(result.Isobands.Features) == 0 {
+		t.Fatal(`expected isobands`)
+	}
+	for _, feature := range result.Isobands.Features {
+		if ceiling := feature.Properties[`ceiling`].(float64); ceiling > 3300 {
+			t.Fatalf(`expected no isoband above the selected maximum, got ceiling %v`, ceiling)
+		}
+	}
+}
