@@ -97,8 +97,8 @@ func preprocessArgs(args *IsobandArgs, grid *GridValues) {
 		return
 	}
 	floor, step := args.Floor, args.Step
-	floor = math.Floor(sliceMinFromFloor(grid.Values, floor)/step) * step
-	args.Floor = floor
+	steps := math.Floor((sliceMinFromFloor(grid.Values, floor) - floor) / step)
+	args.Floor = floor + steps*step
 }
 
 func preprocessGrid(args *IsobandArgs) {

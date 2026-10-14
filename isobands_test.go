@@ -43,7 +43,7 @@ func TestMrmsBaseReflectivity(t *testing.T) {
 			grid_to_isobands.GaussianTransformer(5, 1.0),
 		},
 		Grid:  gridValues,
-		Floor: 5,
+		Floor: 3.75,
 		Step:  2.5,
 		AddlProps: map[string]any{
 			`measure`: `base-reflectivity`,
