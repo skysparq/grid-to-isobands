@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -752,4 +753,62 @@ func globalBands(t *testing.T, valueAt func(lat float64) float64) *grid_to_isoba
 		t.Fatal(err)
 	}
 	return result
+}
+
+func TestBandsPartitionTheGrid(t *testing.T) {
+	// A patch of the MRMS QPE test data where a band-0 polygon's shell
+	// touches itself around a hole of band-1 values. Repairing the polygon as
+	// a whole dropped the hole, so band 0 also covered it and overlapped band 1.
+	patch := [][]float64{
+		{1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.9, 0.9, 0.8, 0.7, 0.7, 0.8, 0.8, 0.7, 0.7},
+		{1.2, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.8, 0.7, 0.7, 0.7, 0.7, 0.7},
+		{1.1, 1.1, 1.0, 1.0, 1.1, 1.0, 1.0, 1.0, 0.9, 0.8, 0.8, 0.7, 0.7, 0.8, 0.7},
+		{1.0, 1.0, 1.0, 1.2, 1.1, 1.0, 1.0, 1.1, 1.1, 0.9, 0.9, 0.8, 0.8, 0.7, 0.7},
+		{1.1, 1.3, 1.2, 1.1, 1.0, 1.0, 1.1, 1.1, 1.1, 1.0, 0.9, 0.9, 0.8, 0.8, 0.8},
+		{1.1, 1.1, 1.1, 1.0, 0.9, 0.8, 0.9, 1.0, 1.0, 1.0, 0.9, 0.9, 0.8, 0.9, 0.9},
+		{0.9, 0.9, 0.8, 0.8, 0.7, 0.7, 0.7, 0.8, 1.0, 1.0, 1.0, 1.1, 1.0, 1.0, 1.0},
+		{0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.9, 1.0, 1.1, 1.1, 1.1, 1.2, 1.1, 1.1},
+		{0.8, 0.7, 0.6, 0.7, 0.8, 0.9, 0.9, 1.0, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.2},
+	}
+	sizeX, sizeY := len(patch[0]), len(patch)
+	var values, lats, lons []float64
+	for row := range sizeY {
+		for col := range sizeX {
+			values = append(values, patch[row][col])
+			lats = append(lats, float64(row))
+			lons = append(lons, float64(col))
+		}
+	}
+	args := &grid_to_isobands.IsobandArgs{
+		Grid:   &grid_to_isobands.GridValues{SizeX: sizeX, SizeY: sizeY, Values: values, Lats: lats, Lons: lons},
+		Levels: []float64{0.25, 1, 2.5},
+	}
+	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Every value is inside the levels, so the bands must cover the grid
+	// exactly once: their areas (shells CCW, holes CW) add up to its area.
+	var area float64
+	for _, feature := range result.Isobands.Features {
+		for _, ring := range feature.Geometry.Coordinates {
+			area += signedArea(ring)
+		}
+	}
+	if want := float64((sizeX - 1) * (sizeY - 1)); math.Abs(area-want) > 1e-6 {
+		t.Fatalf(`bands cover a total area of %v, but the grid's area is %v`, area, want)
+	}
+	if err = validateS2(result.Isobands); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// signedArea is a ring's planar area, positive when counterclockwise.
+func signedArea(ring orb.Ring) float64 {
+	var area float64
+	for i := 0; i+1 < len(ring); i++ {
+		area += ring[i][0]*ring[i+1][1] - ring[i+1][0]*ring[i][1]
+	}
+	return area / 2
 }

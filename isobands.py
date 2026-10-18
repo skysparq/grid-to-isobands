@@ -65,6 +65,25 @@ def split_at_prime_meridian(geom):
     return [shapely.intersection(geom, half) for half in HALVES]
 
 
+def polygonal(geom):
+    # The polygon parts of a make_valid result as one geometry, so overlay
+    # operations never see the stray points and lines a GeometryCollection
+    # can carry.
+    return shapely.unary_union(list(polygon_geoms(geom)))
+
+
+def repair(shell, holes):
+    # Repairs the shell and each hole on its own, then subtracts the holes.
+    # make_valid on the whole polygon can drop a real hole when the shell
+    # touches itself (seen in MRMS QPE data, where a plateau sits exactly on a
+    # level), leaving that area in this band as well as the band it belongs
+    # to, so the bands overlap.
+    region = polygonal(make_valid(Polygon(shell)))
+    if holes:
+        region = region.difference(polygonal(shapely.unary_union([make_valid(Polygon(h)) for h in holes])))
+    return region
+
+
 def polygon_to_rings(polygon):
     # orient() enforces the GeoJSON right-hand-rule convention (CCW shell,
     # CW holes), which repaired/reassembled polygons don't otherwise guarantee.
@@ -127,12 +146,12 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                         continue
                     shell, *holes = [rings[0]] + [ring for ring in rings[1:] if ring]
                     candidate = Polygon(shell, holes)
-                    # make_valid is relatively expensive, so only pay for it
-                    # when contourpy has actually produced a self-intersecting
-                    # (or otherwise invalid) ring -- the common case is valid.
+                    # Repair is relatively expensive, so only pay for it when
+                    # contourpy has actually produced a self-intersecting (or
+                    # otherwise invalid) ring -- the common case is valid.
                     # set_precision's docs warn results are unexpected on
                     # invalid input, so validity must be repaired first.
-                    repaired = candidate if candidate.is_valid else make_valid(candidate)
+                    repaired = candidate if candidate.is_valid else repair(shell, holes)
                     # quad_as_tri routinely emits the same point twice where a
                     # filled boundary runs along a grid edge shared by two
                     # adjacent triangles -- a zero-length edge that GEOS
