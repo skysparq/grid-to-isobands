@@ -1,11 +1,12 @@
 import json
+import math
 import sys
 
 import cbor2
 import numpy as np
 import contourpy
 import shapely
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 from shapely.geometry.polygon import orient
 from shapely.validation import make_valid
 
@@ -23,6 +24,45 @@ def polygon_geoms(geom):
     elif geom.geom_type in ("MultiPolygon", "GeometryCollection"):
         for part in geom.geoms:
             yield from polygon_geoms(part)
+
+
+# The western and eastern halves of the globe, split along the prime meridian.
+HALVES = (box(-180, -90, 0, 90), box(0, -90, 180, 90))
+
+# Polygons covering more than this fraction of the sphere are split. Snowflake
+# flips at one half; the margin covers the area approximation and rounding.
+MAX_SPHERE_FRACTION = 0.45
+
+
+def ring_sphere_fraction(coords):
+    # Area enclosed by a lon/lat ring as a fraction of the sphere (the formula
+    # used by d3-geo and turf). Accurate for short edges like grid-cell steps.
+    total = 0.0
+    for (lon1, lat1), (lon2, lat2) in zip(coords, coords[1:]):
+        total += math.radians(lon2 - lon1) * (2 + math.sin(math.radians(lat1)) + math.sin(math.radians(lat2)))
+    return abs(total) / (8 * math.pi)
+
+
+def sphere_fraction(polygon):
+    return ring_sphere_fraction(polygon.exterior.coords) - sum(
+        ring_sphere_fraction(hole.coords) for hole in polygon.interiors)
+
+
+def split_at_prime_meridian(geom):
+    # S2 engines read a polygon larger than a hemisphere as its complement:
+    # Snowflake loads it without error but stores the smaller side, so a
+    # near-global band silently becomes everything outside it. Polygons near
+    # or over half the sphere are split at 0 degrees into halves that each
+    # span at most 180 degrees of longitude, so each lies within a hemisphere.
+    # (The antimeridian is already a boundary, since grids crossing it are
+    # clipped there.) Thin bands that circle the globe are well under half the
+    # sphere and stay whole. The cut edge runs along a meridian, a great
+    # circle, so S2 draws it exactly as GEOS does and it needs no densifying
+    # while it stays under 180 degrees, i.e. while the polar rows are clipped.
+    # intersection, unlike clip_by_rect, always returns valid geometry.
+    if sum(sphere_fraction(p) for p in polygon_geoms(geom)) <= MAX_SPHERE_FRACTION:
+        return [geom]
+    return [shapely.intersection(geom, half) for half in HALVES]
 
 
 def polygon_to_rings(polygon):
@@ -104,21 +144,26 @@ def grid_to_isobands(values, lats, lons, nx, ny, levels):
                     # distance check, which can silently merge two distinct,
                     # legitimately close vertices and introduce a *new*
                     # self-intersection instead of removing one.
-                    cleaned = shapely.set_precision(repaired, grid_size=1e-9)
-                    for polygon in polygon_geoms(cleaned):
-                        features.append({
-                            "type": "Feature",
-                            "properties": {
-                                "levelIndex": i,
-                                "floor": lower,
-                                "ceiling": upper,
-                                "nominal": nominal
-                            },
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": polygon_to_rings(polygon),
-                            }
-                        })
+                    for part in split_at_prime_meridian(repaired):
+                        cleaned = shapely.set_precision(part, grid_size=1e-9)
+                        for polygon in polygon_geoms(cleaned):
+                            # Splitting along a polygon edge that lies exactly
+                            # on the meridian can leave zero-area slivers.
+                            if polygon.area <= 1e-9:
+                                continue
+                            features.append({
+                                "type": "Feature",
+                                "properties": {
+                                    "levelIndex": i,
+                                    "floor": lower,
+                                    "ceiling": upper,
+                                    "nominal": nominal
+                                },
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": polygon_to_rings(polygon),
+                                }
+                            })
     return {
         "type": "FeatureCollection",
         "features": features

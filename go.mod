@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/fxamacker/cbor v1.5.1
+	github.com/golang/geo v0.0.0-20260928092222-7d12f68cfadb
 	github.com/google/uuid v1.6.0
 	github.com/paulmach/orb v0.13.0
 	github.com/skysparq/grib2-go v0.4.14

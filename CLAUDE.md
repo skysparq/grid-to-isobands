@@ -38,10 +38,12 @@ The entry point is `IsobandsFromGrid(ctx context.Context, args *IsobandArgs) (*R
 
 - Uses `contourpy.contour_generator` (serial, `FillType.ChunkCombinedOffsetOffset`, `quad_as_tri=True`) on the lon/lat/value grids and calls `filled(lower, upper)` for each adjacent pair of levels.
 - Rings with fewer than 4 points or near-zero area (shoelace < 1e-9) are dropped (placeholders keep offsets aligned); a polygon whose shell is dropped is skipped.
-- Invalid polygons are repaired with `make_valid` (only when `is_valid` is false), then `shapely.set_precision(grid_size=1e-9)` collapses duplicate/near-duplicate vertices that S2 rejects. Results are flattened to Polygon parts and oriented to the GeoJSON right-hand rule (CCW shell, CW holes).
+- Invalid polygons are repaired with `make_valid` (only when `is_valid` is false).
+- Polygons covering more than 45% of the sphere (`MAX_SPHERE_FRACTION`, estimated with the d3/turf spherical-area formula) are split at the prime meridian with `shapely.intersection` (`split_at_prime_meridian`). Snowflake silently stores the complement of any polygon larger than a hemisphere (confirmed via `ST_AREA` on a near-global GFS visibility band). Each half spans at most 180° of longitude, so it fits in a hemisphere; thin bands that circle the globe stay whole. The cut follows a meridian (a great circle), so it needs no densifying while the polar rows are clipped (cut edges under 180°).
+- `shapely.set_precision(grid_size=1e-9)` then collapses duplicate/near-duplicate vertices that S2 rejects. Results are flattened to Polygon parts, parts with area ≤ 1e-9 are dropped, and the rest are oriented to the GeoJSON right-hand rule (CCW shell, CW holes).
 - Each feature is a single `Polygon` with properties `levelIndex`, `floor`, `ceiling`, and `nominal` (midpoint of floor and ceiling).
 
-There is no geometry simplification, hole-punching pass, or quadrant splitting.
+There is no geometry simplification or hole-punching pass.
 
 ### Grid Transformers
 
@@ -63,7 +65,7 @@ Missing coordinate-fixing Preprocesses (e.g. `SwapRightAndLeftTransformer` on gl
 
 **Python requirement**: `python3` must be on `PATH` with `cbor2`, `numpy`, `contourpy`, and `shapely` (2.x, for `make_valid`/`set_precision`) installed.
 
-**Go**: `fxamacker/cbor` (wire format), `google/uuid` (temp file names), `paulmach/orb` (ring types), `gonum` (Gaussian convolution), `skysparq/grib2-go` (tests only, for generating test data).
+**Go**: `fxamacker/cbor` (wire format), `google/uuid` (temp file names), `paulmach/orb` (ring types), `gonum` (Gaussian convolution), `skysparq/grib2-go` (tests only, for generating test data), `golang/geo` (S2 validation in `s2check/`).
 
 **Work directory**: `WorkDir` defaults to `./tmp`. It is not created automatically—it must exist before calling `IsobandsFromGrid`.
 
@@ -94,6 +96,7 @@ type ReturnValues struct {
 
 ## Testing
 
-- `isobands_test.go`: End-to-end tests on real NOAA data (MRMS reflectivity/QPE/precip rate/precip flag, GFS pressure/temperature/visibility/humidity) loaded from `.test_files/*.json` (gitignored). Outputs are written to `./test-output/*.geojson` for visual inspection; both `./test-output` and `./tmp` must exist. `TestSelectionsOnlyAffectIsobands` and `TestGenerateLevels` use synthetic data.
+- `isobands_test.go`: End-to-end tests on real NOAA data (MRMS reflectivity/QPE/precip rate/precip flag, GFS pressure/temperature/visibility/humidity) loaded from `.test_files/*.json` (gitignored). Outputs are written to `./test-output/*.geojson` for visual inspection, then `saveTestOutput` fails the test if any feature fails `s2check.ValidatePolygon`; both `./test-output` and `./tmp` must exist. `TestSelectionsOnlyAffectIsobands`, `TestGenerateLevels`, `TestLargeBandsSplitAtPrimeMeridian` and `TestThinGlobalBandsStayWhole` use synthetic data.
 - `generate_test_data_test.go`: `TestGenerate*` tests download GRIB2 files from NOAA's public S3 buckets and write `.test_files/*.json`. Most are `t.Skip()`ped; enable selectively when new data is needed. Note that `TestGenerateFailedGfsHumidity100hpa`, `TestGenerateMultiSensorQpe`, `TestGeneratePrecipFlag`, and `TestGeneratePrecipRate` are currently **not** skipped, so `go test ./...` performs those downloads.
 - `transform_test.go`: Unit tests for `SwapRightAndLeftTransformer` and `ReverseVerticalTransformer`.
+- `s2check/`: `ValidatePolygon(rings []orb.Ring) error` checks a GeoJSON polygon against the rules S2/Snowflake GEOGRAPHY enforce: closed rings with at least 4 points, valid lon/lat, no zero-length edges, no vertex repeated within a ring, no crossing edges, no shared edges or rings crossing at a shared vertex, holes inside the shell and not nested, valid S2 nesting, and area under a hemisphere (a clockwise shell reads as its complement). golang/geo's `Polygon.Validate` doesn't detect self-intersections (an unported TODO), so crossings are found with `CrossingEdgeQuery`. Table tests in `s2check_test.go` cover each failure class.

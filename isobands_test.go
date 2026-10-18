@@ -3,6 +3,7 @@ package grid_to_isobands_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/paulmach/orb"
 	grid_to_isobands "github.com/skysparq/grid-to-isobands"
+	"github.com/skysparq/grid-to-isobands/s2check"
 	"github.com/skysparq/grid-to-isobands/transformers"
 )
 
@@ -608,6 +611,8 @@ func getTestData(filename string) (TestData, error) {
 	return testData, nil
 }
 
+// saveTestOutput writes the isobands for visual inspection, then fails if any
+// feature would be rejected by an S2-based geography engine (e.g. Snowflake).
 func saveTestOutput(isogons *grid_to_isobands.ReturnValues, name string) error {
 	out, err := os.Create(filepath.Join(`./test-output`, name))
 	if err != nil {
@@ -619,7 +624,29 @@ func saveTestOutput(isogons *grid_to_isobands.ReturnValues, name string) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	return validateS2(isogons.Isobands)
+}
+
+// validateS2 reports the S2 validation failures in a FeatureCollection, up to a
+// limit, along with how many features failed in total.
+func validateS2(fc *grid_to_isobands.FeatureCollection) error {
+	const maxReported = 20
+	var errs []error
+	failed := 0
+	for i, feature := range fc.Features {
+		err := s2check.ValidatePolygon(feature.Geometry.Coordinates)
+		if err == nil {
+			continue
+		}
+		failed++
+		if len(errs) < maxReported {
+			errs = append(errs, fmt.Errorf(`feature %d (levelIndex %v): %w`, i, feature.Properties[`levelIndex`], err))
+		}
+	}
+	if failed == 0 {
+		return nil
+	}
+	return fmt.Errorf("%d of %d features fail S2 validation:\n%w", failed, len(fc.Features), errors.Join(errs...))
 }
 
 func TestSelectionsOnlyAffectIsobands(t *testing.T) {
@@ -660,4 +687,69 @@ func TestSelectionsOnlyAffectIsobands(t *testing.T) {
 			t.Fatalf(`expected no isoband above the selected maximum, got ceiling %v`, ceiling)
 		}
 	}
+}
+
+func TestLargeBandsSplitAtPrimeMeridian(t *testing.T) {
+	// Everything between 80S and 80N in one band, which S2 would read as its
+	// complement if it were emitted as one polygon.
+	result := globalBands(t, func(lat float64) float64 { return 1 })
+
+	if len(result.Isobands.Features) != 2 {
+		t.Fatalf(`expected the band to be split into 2 features, got %d`, len(result.Isobands.Features))
+	}
+	for i, feature := range result.Isobands.Features {
+		bound := orb.Polygon(feature.Geometry.Coordinates).Bound()
+		if bound.Min.Lon() < 0 && bound.Max.Lon() > 0 {
+			t.Errorf(`feature %d spans the prime meridian: lon %v to %v`, i, bound.Min.Lon(), bound.Max.Lon())
+		}
+	}
+	if err := validateS2(result.Isobands); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestThinGlobalBandsStayWhole(t *testing.T) {
+	// A band from 40N to 50N circles the globe but covers only a few percent of
+	// it, so it is already read correctly and shouldn't be split.
+	result := globalBands(t, func(lat float64) float64 {
+		if lat >= 40 && lat <= 50 {
+			return 1
+		}
+		return 5
+	})
+
+	if len(result.Isobands.Features) != 1 {
+		t.Fatalf(`expected the band to stay a single feature, got %d`, len(result.Isobands.Features))
+	}
+	if err := validateS2(result.Isobands); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// globalBands contours a 1-degree grid from 80S to 80N with values set by
+// latitude, as a single band between levels 0 and 2.
+func globalBands(t *testing.T, valueAt func(lat float64) float64) *grid_to_isobands.ReturnValues {
+	t.Helper()
+	const sizeX, sizeY = 360, 161
+	values := make([]float64, 0, sizeX*sizeY)
+	lats := make([]float64, 0, sizeX*sizeY)
+	lons := make([]float64, 0, sizeX*sizeY)
+	for row := 0; row < sizeY; row++ {
+		lat := 80 - float64(row)
+		for col := 0; col < sizeX; col++ {
+			values = append(values, valueAt(lat))
+			lats = append(lats, lat)
+			lons = append(lons, -179.5+float64(col))
+		}
+	}
+
+	args := &grid_to_isobands.IsobandArgs{
+		Grid:   &grid_to_isobands.GridValues{SizeX: sizeX, SizeY: sizeY, Values: values, Lats: lats, Lons: lons},
+		Levels: []float64{0, 2},
+	}
+	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
