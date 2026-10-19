@@ -200,7 +200,7 @@ func generateTestData(url string, dest string, index int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create test files directory: %w", err)
 	}
-	var gribR io.Reader
+	var gribR io.ReadCloser
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download test file: %w", err)

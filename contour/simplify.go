@@ -18,6 +18,15 @@ const earthRadius = 6371008.8
 // close to how they look in lon/lat.
 const maxEdge = s1.Angle(math.Pi / 180)
 
+// clearance is the closest a new edge may come to a vertex it doesn't end at.
+// Grid rows and columns line many vertices up exactly (on a column, along a
+// meridian), so a simplified edge can run straight through another ring's
+// vertex. Which side such a vertex falls on is down to rounding when lon/lat
+// is converted to points, and engines round differently: golang/geo may call
+// it clear while Snowflake reports a crossing. About 6 mm, far above rounding
+// and far below any tolerance.
+const clearance = s1.Angle(1e-9)
+
 // hashCell is the size, in degrees, of the cells of the vertex index used to
 // find vertices near a removal.
 const hashCell = 0.05
@@ -427,17 +436,24 @@ func (s *simplifier) allowed(a, i int) bool {
 		}
 	}
 
-	// No other vertex may lie in the triangle the removal sweeps across. If
-	// none does, no edge can cross the new one either: an edge entering the
-	// triangle can't leave through the two existing edges (that would be a
-	// crossing already), so it would have to end inside.
+	// No other vertex may lie in the triangle the removal sweeps across, or
+	// within the clearance of the new edge. If none does, no edge can cross
+	// the new one either: an edge entering the triangle can't leave through
+	// the two existing edges (that would be a crossing already), so it would
+	// have to end inside. Nor can one come within the clearance without a
+	// vertex doing so, as the closest points of two edges that don't cross
+	// include an end of one of them.
 	bounder := s2.NewRectBounder()
 	for _, x := range []s2.Point{P, V, N, P} {
 		bounder.AddPoint(x)
 	}
 	bound := bounder.RectBound()
-	lo := cellOf(orb.Point{bound.Lo().Lng.Degrees(), bound.Lo().Lat.Degrees()})
-	hi := cellOf(orb.Point{bound.Hi().Lng.Degrees(), bound.Hi().Lat.Degrees()})
+	// Pad the bound by the clearance (wider in longitude away from the equator).
+	maxLat := math.Max(math.Abs(bound.Lo().Lat.Radians()), math.Abs(bound.Hi().Lat.Radians()))
+	padLat := clearance.Degrees()
+	padLng := padLat / math.Cos(maxLat+float64(clearance))
+	lo := cellOf(orb.Point{bound.Lo().Lng.Degrees() - padLng, bound.Lo().Lat.Degrees() - padLat})
+	hi := cellOf(orb.Point{bound.Hi().Lng.Degrees() + padLng, bound.Hi().Lat.Degrees() + padLat})
 	orientation := s2.RobustSign(P, V, N)
 	for cx := lo[0]; cx <= hi[0]; cx++ {
 		for cy := lo[1]; cy <= hi[1]; cy++ {
@@ -445,6 +461,9 @@ func (s *simplifier) allowed(a, i int) bool {
 				w := s.arcs[ref.arc].original[ref.index]
 				if w == P || w == V || w == N {
 					continue // these vertices, or another arc's copy of an end
+				}
+				if s2.DistanceFromSegment(w, P, N) < clearance {
+					return false
 				}
 				if s2.RobustSign(P, V, w) == orientation && s2.RobustSign(V, N, w) == orientation && s2.RobustSign(N, P, w) == orientation {
 					return false

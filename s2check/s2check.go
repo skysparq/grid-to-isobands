@@ -12,9 +12,18 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 	"github.com/paulmach/orb"
 )
+
+// MinClearance is the closest a vertex may come to an edge it isn't an end
+// of. Closer, and which side of the edge it is on depends on how lon/lat is
+// rounded to a point, which differs between S2 implementations: a vertex
+// exactly on another ring's edge (easy to get along a grid row or column)
+// passes golang/geo but can fail in Snowflake as a crossing. Rounding is
+// around 1e-16 radians; unsimplified contours stay above 1e-11 in practice.
+const MinClearance = s1.Angle(1e-14)
 
 // maxErrors caps how many problems of one kind are reported for a single polygon.
 const maxErrors = 10
@@ -38,6 +47,9 @@ func ValidatePolygon(rings []orb.Ring) error {
 		return err
 	}
 	if err = checkCrossings(loops); err != nil {
+		return err
+	}
+	if err = checkClearance(loops); err != nil {
 		return err
 	}
 	regions := regionLoops(loops)
@@ -147,14 +159,58 @@ func checkCrossings(loops [][]s2.Point) error {
 			if f <= e {
 				continue
 			}
-			pe, pf := shape.ChainPosition(e), shape.ChainPosition(f)
-			errs = append(errs, fmt.Errorf(`ring %d edge %d crosses ring %d edge %d`, pe.ChainID, pe.Offset, pf.ChainID, pf.Offset))
+			re, oe := ringEdge(loops, e)
+			rf, of := ringEdge(loops, f)
+			errs = append(errs, fmt.Errorf(`ring %d edge %d crosses ring %d edge %d`, re, oe, rf, of))
 			if len(errs) >= maxErrors {
 				return errors.Join(errs...)
 			}
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkClearance finds vertices within MinClearance of an edge they don't
+// end, in the same ring or another.
+func checkClearance(loops [][]s2.Point) error {
+	shape := s2.LaxPolygonFromPoints(loops)
+	index := s2.NewShapeIndex()
+	index.Add(shape)
+	opts := s2.NewClosestEdgeQueryOptions().MaxResults(16).DistanceLimit(s1.ChordAngleFromAngle(MinClearance))
+	query := s2.NewClosestEdgeQuery(index, opts)
+
+	var errs []error
+	for i, loop := range loops {
+		for j, v := range loop {
+			for _, result := range query.FindEdges(s2.NewMinDistanceToPointTarget(v)) {
+				if result.EdgeID() < 0 {
+					continue // no edge, or the shape's interior
+				}
+				edge := shape.Edge(int(result.EdgeID()))
+				if edge.V0 == v || edge.V1 == v {
+					continue
+				}
+				ring, offset := ringEdge(loops, int(result.EdgeID()))
+				errs = append(errs, fmt.Errorf(`ring %d vertex %d is too close to ring %d edge %d (%.3g radians): S2 engines may disagree about which side it is on`,
+					i, j, ring, offset, float64(s2.DistanceFromSegment(v, edge.V0, edge.V1))))
+				if len(errs) >= maxErrors {
+					return errors.Join(errs...)
+				}
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// ringEdge finds the ring and offset of edge e of a LaxPolygon built from
+// loops. (golang/geo's LaxPolygon.ChainPosition returns a vertex count as the
+// chain ID for polygons with more than one loop.)
+func ringEdge(loops [][]s2.Point, e int) (ring, offset int) {
+	for ring < len(loops)-1 && e >= len(loops[ring]) {
+		e -= len(loops[ring])
+		ring++
+	}
+	return ring, e
 }
 
 // regionLoops builds an S2 loop enclosing the region each ring bounds: the
