@@ -77,6 +77,9 @@ type geometry struct {
 	grid   *Grid
 	levels []float64
 	snap   float64 // values within this of a level are treated as on it
+	// flipped reports whether the grid's X/Y coordinates run clockwise as the
+	// index space runs counterclockwise, e.g. when rows go from north to south.
+	flipped bool
 }
 
 func newGeometry(grid *Grid, levels []float64) *geometry {
@@ -84,7 +87,18 @@ func newGeometry(grid *Grid, levels []float64) *geometry {
 	for i := 1; i < len(levels); i++ {
 		gap = min(gap, levels[i]-levels[i-1])
 	}
-	return &geometry{grid: grid, levels: levels, snap: snapTolerance * gap}
+	g := &geometry{grid: grid, levels: levels, snap: snapTolerance * gap}
+	// The grid is assumed not to fold over itself, so one cell's orientation
+	// holds for all of them. Take one from the middle, away from any polar
+	// rows that degenerate in some projections.
+	var area float64
+	cs := g.corners((grid.NX-1)/2, (grid.NY-1)/2)
+	for k, a := range cs {
+		b := cs[(k+1)%4]
+		area += grid.X[a]*grid.Y[b] - grid.X[b]*grid.Y[a]
+	}
+	g.flipped = area < 0
+	return g
 }
 
 // value returns z, or the level it is within rounding error of. A centre is

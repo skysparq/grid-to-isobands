@@ -1,9 +1,11 @@
 package contour
 
 import (
+	"cmp"
 	"encoding/json"
 	"math"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/paulmach/orb"
@@ -24,6 +26,7 @@ type fixture struct {
 		Holes    int          `json:"holes"`
 		Area     float64      `json:"area"`
 		Vertices [][2]float64 `json:"vertices"`
+		Polygons [][2]float64 `json:"polygons"` // [area, holes], sorted by holes then area
 	} `json:"bands"`
 }
 
@@ -60,25 +63,29 @@ func TestMatchesContourpy(t *testing.T) {
 			}
 			for k, want := range f.Bands {
 				band := topo.Bands[k]
-				shells, holes, area := 0, 0, 0.0
+				shells, holes, area := len(band.Polygons), 0, 0.0
 				vertices := make(map[[2]float64]bool)
-				for _, ring := range band.Rings {
-					if topo.IsHole(ring) {
-						holes++
-					} else {
-						shells++
+				var polygons [][2]float64
+				for _, polygon := range band.Polygons {
+					holes += len(polygon.Holes)
+					var polygonArea float64
+					for _, ring := range topo.PolygonCoords(polygon) {
+						polygonArea += shoelace(ring)
+						for _, p := range ring {
+							vertices[roundPoint(p)] = true
+						}
 					}
-					coords := topo.RingCoords(ring)
-					area += shoelace(coords)
-					for _, p := range coords {
-						vertices[roundPoint(p)] = true
-					}
+					area += polygonArea
+					polygons = append(polygons, [2]float64{polygonArea, float64(len(polygon.Holes))})
 				}
 				if shells != want.Shells || holes != want.Holes {
 					t.Errorf(`band %d: got %d shells and %d holes, contourpy has %d and %d`, k, shells, holes, want.Shells, want.Holes)
 				}
 				if math.Abs(area-want.Area) > 1e-9*math.Max(1, math.Abs(want.Area)) {
 					t.Errorf(`band %d: got area %v, contourpy has %v`, k, area, want.Area)
+				}
+				if !samePolygons(polygons, want.Polygons) {
+					t.Errorf(`band %d: got polygons [area, holes] %v, contourpy has %v`, k, polygons, want.Polygons)
 				}
 				missing, extra := compareVertices(vertices, want.Vertices)
 				if len(missing) > 0 || len(extra) > 0 {
@@ -87,6 +94,22 @@ func TestMatchesContourpy(t *testing.T) {
 			}
 		})
 	}
+}
+
+// samePolygons compares [area, holes] pairs sorted by holes, then area, so
+// near-equal areas that sort differently in Go and Python only swap polygons
+// with the same number of holes.
+func samePolygons(got, want [][2]float64) bool {
+	slices.SortFunc(got, func(a, b [2]float64) int { return cmp.Or(cmp.Compare(a[1], b[1]), cmp.Compare(a[0], b[0])) })
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i][1] != want[i][1] || math.Abs(got[i][0]-want[i][0]) > 1e-9*math.Max(1, want[i][0]) {
+			return false
+		}
+	}
+	return true
 }
 
 func shoelace(ring orb.Ring) float64 {

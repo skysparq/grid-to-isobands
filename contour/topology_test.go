@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/paulmach/orb"
@@ -30,7 +31,7 @@ func TestTopologyInvariants(t *testing.T) {
 				t.Fatal(err)
 			}
 			checkArcReferences(t, topo)
-			checkRingsValid(t, topo)
+			checkPolygonsValid(t, topo)
 			checkPartition(t, topo, grid)
 		})
 	}
@@ -82,8 +83,8 @@ func checkArcReferences(t *testing.T, topo *Topology) {
 	type use struct{ forward, reversed []int }
 	uses := make([]use, len(topo.Arcs))
 	for k, band := range topo.Bands {
-		for _, ring := range band.Rings {
-			for _, ref := range ring {
+		for _, polygon := range band.Polygons {
+			for _, ref := range slices.Concat(polygon.Rings()...) {
 				if ref.Reversed {
 					uses[ref.Arc].reversed = append(uses[ref.Arc].reversed, k)
 				} else {
@@ -112,18 +113,13 @@ func checkArcReferences(t *testing.T, topo *Topology) {
 	}
 }
 
-// checkRingsValid checks every ring on its own with s2check, oriented as a
-// shell. (Validating whole polygons needs holes assigned to shells.)
-func checkRingsValid(t *testing.T, topo *Topology) {
+// checkPolygonsValid checks every polygon, holes and all, with s2check.
+func checkPolygonsValid(t *testing.T, topo *Topology) {
 	t.Helper()
 	for k, band := range topo.Bands {
-		for r, ring := range band.Rings {
-			coords := topo.RingCoords(ring)
-			if topo.IsHole(ring) {
-				coords.Reverse()
-			}
-			if err := s2check.ValidatePolygon([]orb.Ring{coords}); err != nil {
-				t.Errorf(`band %d ring %d: %v`, k, r, err)
+		for p, polygon := range band.Polygons {
+			if err := s2check.ValidatePolygon(topo.PolygonCoords(polygon)); err != nil {
+				t.Errorf(`band %d polygon %d: %v`, k, p, err)
 			}
 		}
 	}
@@ -136,8 +132,10 @@ func checkPartition(t *testing.T, topo *Topology, grid *Grid) {
 	t.Helper()
 	var bands float64
 	for _, band := range topo.Bands {
-		for _, ring := range band.Rings {
-			bands += shoelace(topo.RingCoords(ring))
+		for _, polygon := range band.Polygons {
+			for _, ring := range topo.PolygonCoords(polygon) {
+				bands += shoelace(ring)
+			}
 		}
 	}
 	var domain float64

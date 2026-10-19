@@ -7,8 +7,8 @@ import (
 	"github.com/paulmach/orb"
 )
 
-// Topology is the filled contours of a grid as shared arcs and the rings of
-// each band, built from references to those arcs.
+// Topology is the filled contours of a grid as shared arcs and the polygons of
+// each band, whose rings are built from references to those arcs.
 type Topology struct {
 	geom  *geometry
 	Arcs  []Arc
@@ -42,7 +42,7 @@ type Ring []ArcRef
 // A Band is the region where lower < z <= upper.
 type Band struct {
 	Lower, Upper float64
-	Rings        []Ring
+	Polygons     []Polygon
 }
 
 // Contour computes the filled contours of grid between each pair of adjacent
@@ -62,7 +62,11 @@ func Contour(grid *Grid, levels []float64) (*Topology, error) {
 		if err != nil {
 			return nil, fmt.Errorf(`band %d: %w`, k, err)
 		}
-		t.Bands = append(t.Bands, Band{Lower: levels[k], Upper: levels[k+1], Rings: rings})
+		polygons, err := t.buildPolygons(rings)
+		if err != nil {
+			return nil, fmt.Errorf(`band %d: %w`, k, err)
+		}
+		t.Bands = append(t.Bands, Band{Lower: levels[k], Upper: levels[k+1], Polygons: polygons})
 	}
 	return t, nil
 }
@@ -294,22 +298,4 @@ func (t *Topology) RingCoords(r Ring) orb.Ring {
 		}
 	}
 	return append(coords, coords[0])
-}
-
-// IsHole reports whether a ring is a hole, i.e. runs clockwise in index space.
-func (t *Topology) IsHole(r Ring) bool {
-	var index []orb.Point
-	for _, ref := range r {
-		points := t.refPoints(ref)
-		for _, p := range points[:len(points)-1] {
-			_, _, i, j := t.geom.position(p)
-			index = append(index, orb.Point{i, j})
-		}
-	}
-	var area float64
-	for k, p := range index {
-		q := index[(k+1)%len(index)]
-		area += p[0]*q[1] - q[0]*p[1]
-	}
-	return area < 0
 }

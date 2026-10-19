@@ -84,14 +84,16 @@ def filled(x, y, z, levels):
         shells = holes = 0
         area = 0.0
         vertices = set()
+        polygons = []
         for polygon in isobands.polygon_geoms(shapely.unary_union(regions)):
             shells += 1
             holes += len(polygon.interiors)
             area += polygon.area
+            polygons.append([polygon.area, len(polygon.interiors)])  # sorted by holes, then area
             for ring in [polygon.exterior, *polygon.interiors]:
                 vertices.update((round(px, 9), round(py, 9)) for px, py in ring.coords)
         bands.append({'lower': lower, 'upper': upper, 'shells': shells, 'holes': holes,
-                      'area': area, 'vertices': sorted(vertices)})
+                      'area': area, 'vertices': sorted(vertices), 'polygons': sorted(polygons, key=lambda p: (p[1], p[0]))})
     return bands
 
 
@@ -110,6 +112,10 @@ cases = [
     case('peak corner', uniform([[0, 0], [0, 4]]), [0.5, 2, 10]),
     case('ring band', uniform([[0, 0, 0, 0], [0, 5, 5, 0], [0, 5, 5, 0], [0, 0, 0, 0]]), [1, 10]),
     case('band with hole', uniform([[0, 0, 0, 0, 0], [0, 2, 2, 2, 0], [0, 2, 9, 2, 0], [0, 2, 2, 2, 0], [0, 0, 0, 0, 0]]), [1, 5, 10]),
+    # Concentric squares alternating 0 and 5: a shell with a hole containing
+    # an island with a hole, so the inner hole is inside two shells.
+    case('nested islands and holes', uniform(
+        [[5 * (1 - max(abs(i - 4), abs(j - 4)) % 2) for i in range(9)] for j in range(9)]), [1, 10]),
     case('saddle', uniform([[0, 5], [5, 0]]), [1, 2, 4]),
     case('saddle centre at a level', uniform([[0, 5], [5, 0]]), [1, 2.5, 4]),
     case('one NaN corner', uniform([[1, 1], [1, NAN]]), [0, 2]),
