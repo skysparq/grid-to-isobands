@@ -502,18 +502,25 @@ func runEndToEnd(t *testing.T, c endToEndCase, backend grid_to_isobands.Backend)
 	return result
 }
 
-// saveEndToEnd runs a case with the default backend, saves the output for
+// saveEndToEnd runs a case with the default backend (Go), saves the output for
 // visual inspection and checks it with s2check.
 func saveEndToEnd(t *testing.T, c endToEndCase) {
 	t.Helper()
-	if err := saveTestOutput(runEndToEnd(t, c, grid_to_isobands.BackendPython), c.output); err != nil {
+	if err := saveTestOutput(runEndToEnd(t, c, grid_to_isobands.BackendGo), c.output); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// TestBackendsAgree runs every real-data case through both backends: the Go
-// output must pass s2check and cover the same area at each level as the
-// Python output.
+func TestDefaultBackendIsGo(t *testing.T) {
+	if backend := (grid_to_isobands.IsobandArgs{}).Backend; backend != grid_to_isobands.BackendGo {
+		t.Fatalf(`expected the default backend to be BackendGo, got %d`, backend)
+	}
+}
+
+// TestBackendsAgree runs every real-data case through both backends: both
+// outputs must pass s2check, and the Go output must cover the same area at
+// each level as the Python output. The Python output is saved as
+// *-python.geojson for comparison.
 func TestBackendsAgree(t *testing.T) {
 	for _, c := range endToEndCases {
 		name := strings.TrimSuffix(c.output, `.geojson`)
@@ -524,7 +531,10 @@ func TestBackendsAgree(t *testing.T) {
 			start = time.Now()
 			result := runEndToEnd(t, c, grid_to_isobands.BackendGo)
 			goTime := time.Since(start)
-			if err := saveTestOutput(result, name+`-go.geojson`); err != nil {
+			if err := validateS2(result.Isobands); err != nil {
+				t.Error(err)
+			}
+			if err := saveTestOutput(&grid_to_isobands.ReturnValues{Isobands: py}, name+`-python.geojson`); err != nil {
 				t.Error(err)
 			}
 			t.Logf(`python %v, %d features; go %v, %d features`, pyTime.Round(time.Millisecond), len(py.Features), goTime.Round(time.Millisecond), len(result.Isobands.Features))
@@ -803,7 +813,7 @@ func signedArea(ring orb.Ring) float64 {
 
 // forEachBackend runs a test against each backend as a subtest.
 func forEachBackend(t *testing.T, test func(t *testing.T, backend grid_to_isobands.Backend)) {
-	for name, backend := range map[string]grid_to_isobands.Backend{`python`: grid_to_isobands.BackendPython, `go`: grid_to_isobands.BackendGo} {
+	for name, backend := range map[string]grid_to_isobands.Backend{`go`: grid_to_isobands.BackendGo, `python`: grid_to_isobands.BackendPython} {
 		t.Run(name, func(t *testing.T) { test(t, backend) })
 	}
 }

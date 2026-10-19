@@ -47,7 +47,7 @@ type IsobandArgs struct {
 	AddlProps map[string]any
 	// WorkDir holds the Python backend's temporary files.
 	WorkDir string
-	// Backend chooses how isobands are contoured. The default is BackendPython.
+	// Backend chooses how isobands are contoured. The default is BackendGo.
 	Backend Backend
 }
 
@@ -55,11 +55,13 @@ type IsobandArgs struct {
 type Backend int
 
 const (
-	// BackendPython pipes the grid to isobands.py (contourpy and shapely).
-	BackendPython Backend = iota
 	// BackendGo contours in Go with the contour and meridian packages, with no
-	// Python, temporary files or repair step.
-	BackendGo
+	// Python, temporary files or repair step. It is the zero value, so it is
+	// the default.
+	BackendGo Backend = iota
+	// BackendPython pipes the grid to isobands.py (contourpy and shapely). It
+	// needs python3 with those packages, and WorkDir to exist.
+	BackendPython
 )
 
 // pyArgs is the wire format sent to the Python isoband-generation subprocess.
@@ -166,10 +168,10 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	var isobands *FeatureCollection
 	var err error
 	switch args.Backend {
-	case BackendPython:
-		isobands, err = pythonIsobands(ctx, args, grid, levels)
 	case BackendGo:
 		isobands, err = goIsobands(ctx, grid, levels)
+	case BackendPython:
+		isobands, err = pythonIsobands(ctx, args, grid, levels)
 	default:
 		err = fmt.Errorf("unknown backend %d", args.Backend)
 	}
