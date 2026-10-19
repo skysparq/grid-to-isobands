@@ -3,6 +3,7 @@ package contour
 import (
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/paulmach/orb"
 )
@@ -21,11 +22,15 @@ type Topology struct {
 // starts and ends at the same point.
 type Arc struct {
 	points []pointID
+	coords []orb.Point // the points' X/Y coordinates
 	// Level is the index of the level a contour-line arc follows, with the
 	// higher values on its left, or -1 for an arc along the edge of the data.
 	Level int
 	// Band is the band an edge-of-data arc bounds, on its left, or -1.
 	Band int
+	// Dropped reports whether the arc was removed with a tiny ring during
+	// simplification. No ring references a dropped arc.
+	Dropped bool
 }
 
 // An ArcRef is one arc's use in a ring, reversed if the ring runs against it.
@@ -140,7 +145,12 @@ func (t *Topology) buildArcs(s *segments) {
 					break // back at the start of a closed loop
 				}
 			}
-			t.Arcs = append(t.Arcs, Arc{points: points, Level: gr.level, Band: gr.band})
+			coords := make([]orb.Point, len(points))
+			for i, p := range points {
+				x, y, _, _ := t.geom.position(p)
+				coords[i] = orb.Point{x, y}
+			}
+			t.Arcs = append(t.Arcs, Arc{points: points, coords: coords, Level: gr.level, Band: gr.band})
 		}
 		for i, seg := range gr.segs {
 			if !visited[i] && junction(seg.from) {
@@ -278,23 +288,20 @@ func (t *Topology) refPoints(ref ArcRef) []pointID {
 
 // ArcCoords returns the coordinates of an arc's points.
 func (t *Topology) ArcCoords(arc int) []orb.Point {
-	points := t.Arcs[arc].points
-	coords := make([]orb.Point, len(points))
-	for i, p := range points {
-		x, y, _, _ := t.geom.position(p)
-		coords[i] = orb.Point{x, y}
-	}
-	return coords
+	return slices.Clone(t.Arcs[arc].coords)
 }
 
 // RingCoords returns a ring's coordinates as a closed ring.
 func (t *Topology) RingCoords(r Ring) orb.Ring {
 	var coords orb.Ring
 	for _, ref := range r {
-		points := t.refPoints(ref)
-		for _, p := range points[:len(points)-1] {
-			x, y, _, _ := t.geom.position(p)
-			coords = append(coords, orb.Point{x, y})
+		arc := t.Arcs[ref.Arc].coords
+		if ref.Reversed {
+			for i := len(arc) - 1; i > 0; i-- {
+				coords = append(coords, arc[i])
+			}
+		} else {
+			coords = append(coords, arc[:len(arc)-1]...)
 		}
 	}
 	return append(coords, coords[0])

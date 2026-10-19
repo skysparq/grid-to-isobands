@@ -49,6 +49,11 @@ type IsobandArgs struct {
 	WorkDir string
 	// Backend chooses how isobands are contoured. The default is BackendGo.
 	Backend Backend
+	// Simplify, if set, simplifies the isobands without changing their
+	// topology: shared boundaries are simplified once, tiny rings are dropped
+	// with their counterparts, and the result stays S2-valid. Only the Go
+	// backend supports it.
+	Simplify *contour.SimplifyOptions
 }
 
 // Backend is how isobands are contoured.
@@ -169,8 +174,11 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	var err error
 	switch args.Backend {
 	case BackendGo:
-		isobands, err = goIsobands(ctx, grid, levels)
+		isobands, err = goIsobands(ctx, grid, levels, args.Simplify)
 	case BackendPython:
+		if args.Simplify != nil {
+			return nil, fmt.Errorf("the Python backend doesn't support Simplify")
+		}
 		isobands, err = pythonIsobands(ctx, args, grid, levels)
 	default:
 		err = fmt.Errorf("unknown backend %d", args.Backend)
@@ -183,15 +191,22 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	return isobands, nil
 }
 
-// goIsobands contours the grid in Go, splitting any polygon too large for S2
-// engines at the prime meridian, as isobands.py does.
-func goIsobands(ctx context.Context, grid *GridValues, levels []float64) (*FeatureCollection, error) {
+// goIsobands contours the grid in Go, optionally simplifies it, and splits any
+// polygon too large for S2 engines at the prime meridian, as isobands.py does.
+// The split comes after simplification so its cut edges are kept exactly.
+func goIsobands(ctx context.Context, grid *GridValues, levels []float64, simplify *contour.SimplifyOptions) (*FeatureCollection, error) {
 	topo, err := contour.Contour(&contour.Grid{NX: grid.SizeX, NY: grid.SizeY, X: grid.Lons, Y: grid.Lats, Z: grid.Values}, levels)
 	if err != nil {
 		return nil, err
 	}
 	if err = ctx.Err(); err != nil {
 		return nil, err
+	}
+	if simplify != nil {
+		topo.Simplify(*simplify)
+		if err = ctx.Err(); err != nil {
+			return nil, err
+		}
 	}
 	isobands := &FeatureCollection{Type: "FeatureCollection", Features: []Feature{}}
 	for k, band := range topo.Bands {

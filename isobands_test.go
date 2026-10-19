@@ -16,6 +16,7 @@ import (
 
 	"github.com/paulmach/orb"
 	grid_to_isobands "github.com/skysparq/grid-to-isobands"
+	"github.com/skysparq/grid-to-isobands/contour"
 	"github.com/skysparq/grid-to-isobands/s2check"
 	"github.com/skysparq/grid-to-isobands/transformers"
 )
@@ -573,6 +574,58 @@ func levelAreas(fc *grid_to_isobands.FeatureCollection) map[int]float64 {
 		}
 	}
 	return areas
+}
+
+// TestSimplifiedEndToEnd simplifies every real-data case, saving the output as
+// *-simplified.geojson for comparison: it must pass s2check and have fewer
+// points than the unsimplified output.
+func TestSimplifiedEndToEnd(t *testing.T) {
+	for _, c := range endToEndCases {
+		name := strings.TrimSuffix(c.output, `.geojson`)
+		t.Run(name, func(t *testing.T) {
+			full := runEndToEnd(t, c, grid_to_isobands.BackendGo).Isobands
+			testData, err := getTestData(c.data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := c.args(&grid_to_isobands.GridValues{SizeX: testData.SizeX, SizeY: testData.SizeY, Lats: testData.Lats, Lons: testData.Lngs, Values: testData.Values})
+			args.Simplify = &contour.SimplifyOptions{Tolerance: 1000, MinRingArea: 4e6}
+			result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = saveTestOutput(result, name+`-simplified.geojson`); err != nil {
+				t.Error(err)
+			}
+			before, after := countPoints(full), countPoints(result.Isobands)
+			t.Logf(`%d -> %d features, %d -> %d points (%.1f%%)`, len(full.Features), len(result.Isobands.Features), before, after, 100*float64(after)/float64(before))
+			if after >= before {
+				t.Errorf(`simplification kept all %d points`, before)
+			}
+		})
+	}
+}
+
+func TestSimplifyNeedsGoBackend(t *testing.T) {
+	_, err := grid_to_isobands.IsobandsFromGrid(context.Background(), &grid_to_isobands.IsobandArgs{
+		Grid:     &grid_to_isobands.GridValues{SizeX: 2, SizeY: 2, Values: []float64{0, 1, 2, 3}, Lats: []float64{1, 1, 0, 0}, Lons: []float64{0, 1, 0, 1}},
+		Levels:   []float64{0, 4},
+		Backend:  grid_to_isobands.BackendPython,
+		Simplify: &contour.SimplifyOptions{Tolerance: 100},
+	})
+	if err == nil {
+		t.Fatal(`expected an error simplifying with the Python backend`)
+	}
+}
+
+func countPoints(fc *grid_to_isobands.FeatureCollection) int {
+	n := 0
+	for _, feature := range fc.Features {
+		for _, ring := range feature.Geometry.Coordinates {
+			n += len(ring)
+		}
+	}
+	return n
 }
 
 func getTestData(filename string) (TestData, error) {

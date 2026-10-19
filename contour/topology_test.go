@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/golang/geo/s2"
 	"github.com/paulmach/orb"
 	"github.com/skysparq/grid-to-isobands/s2check"
 )
@@ -32,6 +33,7 @@ func TestTopologyInvariants(t *testing.T) {
 			}
 			checkArcReferences(t, topo)
 			checkPolygonsValid(t, topo)
+			checkNoCrossings(t, topo)
 			checkPartition(t, topo, grid)
 		})
 	}
@@ -96,6 +98,8 @@ func checkArcReferences(t *testing.T, topo *Topology) {
 	for a, arc := range topo.Arcs {
 		var wantForward, wantReversed []int
 		switch {
+		case arc.Dropped:
+			// dropped with a tiny ring: used by nothing
 		case arc.Level < 0:
 			wantForward = []int{arc.Band}
 		default:
@@ -121,6 +125,56 @@ func checkPolygonsValid(t *testing.T, topo *Topology) {
 			if err := s2check.ValidatePolygon(topo.PolygonCoords(polygon)); err != nil {
 				t.Errorf(`band %d polygon %d: %v`, k, p, err)
 			}
+		}
+	}
+}
+
+// checkNoCrossings checks the whole topology at once on the sphere: no edge of
+// any arc crosses another, and no two arcs share an edge. s2check validates
+// one polygon at a time, so it can't see one band's boundary pushed across
+// another's.
+func checkNoCrossings(t *testing.T, topo *Topology) {
+	t.Helper()
+	index := s2.NewShapeIndex()
+	type edgeKey struct{ a, b s2.Point }
+	edges := make(map[edgeKey]int)
+	for a, arc := range topo.Arcs {
+		if arc.Dropped {
+			continue
+		}
+		points := make([]s2.Point, len(arc.coords))
+		for i, c := range arc.coords {
+			points[i] = s2.PointFromLatLng(s2.LatLngFromDegrees(c[1], c[0]))
+		}
+		for i := 0; i+1 < len(points); i++ {
+			k := edgeKey{points[i], points[i+1]}
+			if points[i+1].Cmp(points[i].Vector) < 0 {
+				k = edgeKey{points[i+1], points[i]}
+			}
+			if other, ok := edges[k]; ok {
+				t.Errorf(`arcs %d and %d share the edge %v - %v`, other, a, arc.coords[i], arc.coords[i+1])
+			}
+			edges[k] = a
+		}
+		polyline := s2.Polyline(points)
+		index.Add(&polyline)
+	}
+	query := s2.NewCrossingEdgeQuery(index)
+	crossings := 0
+	for a, arc := range topo.Arcs {
+		if arc.Dropped {
+			continue
+		}
+		for i := 0; i+1 < len(arc.coords); i++ {
+			u := s2.PointFromLatLng(s2.LatLngFromDegrees(arc.coords[i][1], arc.coords[i][0]))
+			v := s2.PointFromLatLng(s2.LatLngFromDegrees(arc.coords[i+1][1], arc.coords[i+1][0]))
+			for _, hits := range query.CrossingsEdgeMap(u, v, s2.CrossingTypeInterior) {
+				crossings += len(hits)
+			}
+		}
+		if crossings > 0 {
+			t.Errorf(`edges of arc %d cross other edges`, a)
+			return
 		}
 	}
 }
