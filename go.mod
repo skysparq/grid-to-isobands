@@ -1,13 +1,13 @@
 module github.com/skysparq/grid-to-isobands
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/fxamacker/cbor v1.5.1
 	github.com/golang/geo v0.0.0-20260928092222-7d12f68cfadb
 	github.com/google/uuid v1.6.0
 	github.com/paulmach/orb v0.13.0
-	github.com/skysparq/grib2-go v0.4.14
+	github.com/skysparq/grib2-go v0.5.3
 	gonum.org/v1/gonum v0.17.0
 )
 
