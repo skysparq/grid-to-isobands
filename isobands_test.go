@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,331 +30,226 @@ func TestGenerateLevels(t *testing.T) {
 	}
 }
 
+var mrmsBaseReflectivity = endToEndCase{
+	data:   `mrms-base-reflectivity.json`,
+	output: `mrms-base-reflectivity.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.BilateralTransformer(1, 2.5),
+				grid_to_isobands.CloseOpenTransformer(3),
+				grid_to_isobands.GaussianTransformer(5, 1.0),
+			},
+			Grid:  gridValues,
+			Floor: 3.75,
+			Step:  2.5,
+			AddlProps: map[string]any{
+				`measure`: `base-reflectivity`,
+				`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
+			},
+		}
+	},
+}
+
 func TestMrmsBaseReflectivity(t *testing.T) {
-	testData, err := getTestData(`mrms-base-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(1, 2.5),
-			grid_to_isobands.CloseOpenTransformer(3),
-			grid_to_isobands.GaussianTransformer(5, 1.0),
-		},
-		Grid:  gridValues,
-		Floor: 3.75,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `base-reflectivity`,
-			`at`:      time.Date(2025, 12, 11, 23, 59, 17, 0, time.UTC),
-		},
-	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = saveTestOutput(isobands, `mrms-base-reflectivity.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsBaseReflectivity)
+}
+
+var mrmsBaseReflectivity2 = endToEndCase{
+	data:   `mrms-base-reflectivity-2.json`,
+	output: `mrms-base-reflectivity-2.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.BilateralTransformer(2, 5),
+				grid_to_isobands.CloseOpenTransformer(7),
+				grid_to_isobands.GaussianTransformer(7, 1.5),
+			},
+			Grid:  gridValues,
+			Floor: 5,
+			Step:  2.5,
+			AddlProps: map[string]any{
+				`measure`: `base-reflectivity`,
+				`at`:      time.Date(2026, 1, 6, 17, 2, 0, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsBaseReflectivity2(t *testing.T) {
-	testData, err := getTestData(`mrms-base-reflectivity-2.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(2, 5),
-			grid_to_isobands.CloseOpenTransformer(7),
-			grid_to_isobands.GaussianTransformer(7, 1.5),
-		},
-		Grid:  gridValues,
-		Floor: 5,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `base-reflectivity`,
-			`at`:      time.Date(2026, 1, 6, 17, 2, 0, 0, time.UTC),
-		},
-	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = saveTestOutput(isobands, `mrms-base-reflectivity-2.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsBaseReflectivity2)
+}
+
+var mrmsKnoxTornadoBaseReflectivity = endToEndCase{
+	data:   `mrms-knox-tornado-base-reflectivity.json`,
+	output: `mrms-knox-tornado-base-reflectivity.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.BilateralTransformer(1, 2.5),
+				grid_to_isobands.CloseOpenTransformer(3),
+				grid_to_isobands.GaussianTransformer(5, 1.0),
+			},
+			Grid:  gridValues,
+			Floor: 5,
+			Step:  2.5,
+			AddlProps: map[string]any{
+				`measure`: `base-reflectivity`,
+				`at`:      time.Date(2026, 3, 11, 1, 10, 14, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsKnoxTornadoBaseReflectivity(t *testing.T) {
-	testData, err := getTestData(`mrms-knox-tornado-base-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(1, 2.5),
-			grid_to_isobands.CloseOpenTransformer(3),
-			grid_to_isobands.GaussianTransformer(5, 1.0),
-		},
-		Grid:  gridValues,
-		Floor: 5,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `base-reflectivity`,
-			`at`:      time.Date(2026, 3, 11, 1, 10, 14, 0, time.UTC),
-		},
-	}
-	isobands, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = saveTestOutput(isobands, `mrms-knox-tornado-base-reflectivity.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsKnoxTornadoBaseReflectivity)
+}
+
+var mrmsCompositeReflectivity = endToEndCase{
+	data:   `mrms-composite-reflectivity.json`,
+	output: `mrms-composite-reflectivity.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.BilateralTransformer(2, 5),
+				grid_to_isobands.CloseOpenTransformer(7),
+				grid_to_isobands.GaussianTransformer(7, 1.5),
+			},
+			Grid:  gridValues,
+			Floor: 5,
+			Step:  2.5,
+			AddlProps: map[string]any{
+				`measure`: `composite-reflectivity`,
+				`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsCompositeReflectivity(t *testing.T) {
-	testData, err := getTestData(`mrms-composite-reflectivity.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(2, 5),
-			grid_to_isobands.CloseOpenTransformer(7),
-			grid_to_isobands.GaussianTransformer(7, 1.5),
-		},
-		Grid:  gridValues,
-		Floor: 5,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `composite-reflectivity`,
-			`at`:      time.Date(2026, 1, 7, 19, 2, 36, 0, time.UTC),
-		},
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsCompositeReflectivity)
+}
 
-	err = saveTestOutput(isogons, `mrms-composite-reflectivity.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+var mrmsMultiSensorQpe = endToEndCase{
+	data:   `multi-sensor-qpe.json`,
+	output: `qpe.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{},
+			Grid:         gridValues,
+			Levels:       []float64{0.25, 1, 2.5, 5, 10, 15, 25, 40, 50, 75, 100, 150, 1000},
+			AddlProps: map[string]any{
+				`measure`: `qpe`,
+				`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsMultiSensorQpe(t *testing.T) {
-	testData, err := getTestData(`multi-sensor-qpe.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{},
-		Grid:         gridValues,
-		Levels:       []float64{0.25, 1, 2.5, 5, 10, 15, 25, 40, 50, 75, 100, 150, 1000},
-		AddlProps: map[string]any{
-			`measure`: `qpe`,
-			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
-		},
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsMultiSensorQpe)
+}
 
-	err = saveTestOutput(isogons, `qpe.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+var mrmsPrecipRate = endToEndCase{
+	data:   `precip-rate.json`,
+	output: `precip-rate.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
+				grid_to_isobands.MedianTransformer(3),
+				grid_to_isobands.GaussianTransformer(5, 0.7),
+			},
+			Grid:   gridValues,
+			Levels: []float64{0.1, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 10000},
+			AddlProps: map[string]any{
+				`measure`: `precip-rate`,
+				`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsPrecipRate(t *testing.T) {
-	testData, err := getTestData(`precip-rate.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
-			grid_to_isobands.MedianTransformer(3),
-			grid_to_isobands.GaussianTransformer(5, 0.7),
-		},
-		Grid:   gridValues,
-		Levels: []float64{0.1, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 10000},
-		AddlProps: map[string]any{
-			`measure`: `precip-rate`,
-			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
-		},
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsPrecipRate)
+}
 
-	err = saveTestOutput(isogons, `precip-rate.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+var mrmsPrecipFlag = endToEndCase{
+	data:   `precip-flag.json`,
+	output: `precip-flag.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
+			},
+			Grid:   gridValues,
+			Levels: []float64{0.5, 1.5, 2.5, 3.5, 5.5, 6.5, 7.5, 9.5, 10.5, 90.5, 91.5, 95.5, 96.5},
+			AddlProps: map[string]any{
+				`measure`: `precip-flag`,
+				`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsPrecipFlag(t *testing.T) {
-	testData, err := getTestData(`precip-flag.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.ThresholdMaskTransformer(transformers.LessThan(0), 0),
-		},
-		Grid:   gridValues,
-		Levels: []float64{0.5, 1.5, 2.5, 3.5, 5.5, 6.5, 7.5, 9.5, 10.5, 90.5, 91.5, 95.5, 96.5},
-		AddlProps: map[string]any{
-			`measure`: `precip-flag`,
-			`at`:      time.Date(2026, 8, 5, 0, 2, 0, 0, time.UTC),
-		},
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsPrecipFlag)
+}
 
-	err = saveTestOutput(isogons, `precip-flag.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+var mrmsCompositeReflectivity2 = endToEndCase{
+	data:   `mrms-composite-reflectivity-2.json`,
+	output: `mrms-composite-reflectivity-2.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.BilateralTransformer(2, 5),
+				grid_to_isobands.CloseOpenTransformer(7),
+				grid_to_isobands.GaussianTransformer(7, 1.5),
+			},
+			Grid:  gridValues,
+			Floor: 5,
+			Step:  2.5,
+			AddlProps: map[string]any{
+				`measure`: `composite-reflectivity`,
+				`at`:      time.Date(2026, 1, 7, 20, 30, 37, 0, time.UTC),
+			},
+		}
+	},
 }
 
 func TestMrmsCompositeReflectivity2(t *testing.T) {
-	testData, err := getTestData(`mrms-composite-reflectivity-2.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.BilateralTransformer(2, 5),
-			grid_to_isobands.CloseOpenTransformer(7),
-			grid_to_isobands.GaussianTransformer(7, 1.5),
-		},
-		Grid:  gridValues,
-		Floor: 5,
-		Step:  2.5,
-		AddlProps: map[string]any{
-			`measure`: `composite-reflectivity`,
-			`at`:      time.Date(2026, 1, 7, 20, 30, 37, 0, time.UTC),
-		},
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, mrmsCompositeReflectivity2)
+}
 
-	err = saveTestOutput(isogons, `mrms-composite-reflectivity-2.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+var gfsBaroPressure = endToEndCase{
+	data:   `gfs-baro-pressure-msl.json`,
+	output: `baro-pressure-msl.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.SwapRightAndLeftTransformer(),
+				grid_to_isobands.ClipTransformer(transformers.Clip{
+					Top:    20,
+					Bottom: 20,
+					Left:   1,
+					Right:  1,
+				}),
+				grid_to_isobands.GaussianTransformer(7, 1),
+			},
+			Grid:  gridValues,
+			Floor: 0,
+			Step:  250,
+			AddlProps: map[string]any{
+				`measure`: `baro-pressure-msl`,
+				`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
+			},
+			WorkDir: "./tmp",
+		}
+	},
 }
 
 func TestGfsBaroPressure(t *testing.T) {
-	testData, err := getTestData(`gfs-baro-pressure-msl.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.SwapRightAndLeftTransformer(),
-			grid_to_isobands.ClipTransformer(transformers.Clip{
-				Top:    20,
-				Bottom: 20,
-				Left:   1,
-				Right:  1,
-			}),
-			grid_to_isobands.GaussianTransformer(7, 1),
-		},
-		Grid:  gridValues,
-		Floor: 0,
-		Step:  250,
-		AddlProps: map[string]any{
-			`measure`: `baro-pressure-msl`,
-			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
-		},
-		WorkDir: "./tmp",
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = saveTestOutput(isogons, `baro-pressure-msl.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, gfsBaroPressure)
 }
 
 /*
@@ -392,47 +289,35 @@ func TestGfsBaroPressure(t *testing.T) {
 		}
 	}
 */
-func TestSurfaceTemp(t *testing.T) {
-	testData, err := getTestData(`temperature-surface.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.SwapRightAndLeftTransformer(),
-			grid_to_isobands.ClipTransformer(transformers.Clip{
-				Top:    20,
-				Bottom: 20,
-				Left:   1,
-				Right:  1,
-			}),
-			grid_to_isobands.GaussianTransformer(7, 1),
-		},
-		Grid:  gridValues,
-		Floor: 0,
-		Step:  2,
-		AddlProps: map[string]any{
-			`measure`: `temperature-surface`,
-			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
-		},
-		WorkDir: "./tmp",
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+var surfaceTemp = endToEndCase{
+	data:   `temperature-surface.json`,
+	output: `temperature-surface.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.SwapRightAndLeftTransformer(),
+				grid_to_isobands.ClipTransformer(transformers.Clip{
+					Top:    20,
+					Bottom: 20,
+					Left:   1,
+					Right:  1,
+				}),
+				grid_to_isobands.GaussianTransformer(7, 1),
+			},
+			Grid:  gridValues,
+			Floor: 0,
+			Step:  2,
+			AddlProps: map[string]any{
+				`measure`: `temperature-surface`,
+				`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
+			},
+			WorkDir: "./tmp",
+		}
+	},
+}
 
-	err = saveTestOutput(isogons, `temperature-surface.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestSurfaceTemp(t *testing.T) {
+	saveEndToEnd(t, surfaceTemp)
 }
 
 /*
@@ -472,91 +357,67 @@ func TestSurfaceTemp(t *testing.T) {
 		}
 	}
 */
-func TestVisibilitySurface(t *testing.T) {
-	testData, err := getTestData(`visibility-surface.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.SwapRightAndLeftTransformer(),
-			grid_to_isobands.ClipTransformer(transformers.Clip{
-				Top:    20,
-				Bottom: 20,
-				Left:   1,
-				Right:  1,
-			}),
-			grid_to_isobands.BilateralTransformer(1, 2500),
-			grid_to_isobands.GaussianTransformer(3, 1.0),
-		},
-		Grid:  gridValues,
-		Floor: 0,
-		Step:  2500,
-		AddlProps: map[string]any{
-			`measure`: `visibility-surface`,
-			`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
-		},
-		WorkDir: "./tmp",
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
+var visibilitySurface = endToEndCase{
+	data:   `visibility-surface.json`,
+	output: `visibility-surface.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.SwapRightAndLeftTransformer(),
+				grid_to_isobands.ClipTransformer(transformers.Clip{
+					Top:    20,
+					Bottom: 20,
+					Left:   1,
+					Right:  1,
+				}),
+				grid_to_isobands.BilateralTransformer(1, 2500),
+				grid_to_isobands.GaussianTransformer(3, 1.0),
+			},
+			Grid:  gridValues,
+			Floor: 0,
+			Step:  2500,
+			AddlProps: map[string]any{
+				`measure`: `visibility-surface`,
+				`at`:      time.Date(2025, 10, 3, 12, 0, 0, 0, time.UTC),
+			},
+			WorkDir: "./tmp",
+		}
+	},
+}
 
-	err = saveTestOutput(isogons, `visibility-surface.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestVisibilitySurface(t *testing.T) {
+	saveEndToEnd(t, visibilitySurface)
+}
+
+var failedGfsHumidity100hpa = endToEndCase{
+	data:   `failed-gfs-humidity-100hpa.json`,
+	output: `failed-gfs-humidity-100hpa.geojson`,
+	args: func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs {
+		return &grid_to_isobands.IsobandArgs{
+			Preprocesses: []grid_to_isobands.GridTransformer{
+				grid_to_isobands.SwapRightAndLeftTransformer(),
+				grid_to_isobands.GaussianTransformer(7, 1),
+				grid_to_isobands.ClipTransformer(transformers.Clip{
+					Top:    20,
+					Bottom: 20,
+					Left:   1,
+					Right:  1,
+				}),
+			},
+			Grid:  gridValues,
+			Floor: 0,
+			Step:  10,
+			AddlProps: map[string]any{
+				`measure`: `humidity-100hpa`,
+				`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
+			},
+			WorkDir: "./tmp",
+		}
+	},
 }
 
 func TestFailedGfsHumidity100hpa(t *testing.T) {
-	testData, err := getTestData(`failed-gfs-humidity-100hpa.json`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gridValues := &grid_to_isobands.GridValues{
-		SizeX:  testData.SizeX,
-		SizeY:  testData.SizeY,
-		Lats:   testData.Lats,
-		Lons:   testData.Lngs,
-		Values: testData.Values,
-	}
-	args := &grid_to_isobands.IsobandArgs{
-		Preprocesses: []grid_to_isobands.GridTransformer{
-			grid_to_isobands.SwapRightAndLeftTransformer(),
-			grid_to_isobands.GaussianTransformer(7, 1),
-			grid_to_isobands.ClipTransformer(transformers.Clip{
-				Top:    20,
-				Bottom: 20,
-				Left:   1,
-				Right:  1,
-			}),
-		},
-		Grid:  gridValues,
-		Floor: 0,
-		Step:  10,
-		AddlProps: map[string]any{
-			`measure`: `humidity-100hpa`,
-			`at`:      time.Date(2025, 10, 2, 12, 0, 0, 0, time.UTC),
-		},
-		WorkDir: "./tmp",
-	}
-	isogons, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = saveTestOutput(isogons, `failed-gfs-humidity-100hpa.geojson`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	saveEndToEnd(t, failedGfsHumidity100hpa)
 }
 
 /*
@@ -596,6 +457,114 @@ func TestFailedGfsHumidity100hpa(t *testing.T) {
 		}
 	}
 */
+// endToEndCase is a real-data test: a grid from .test_files, the arguments to
+// contour it with, and where to write the result.
+type endToEndCase struct {
+	data, output string
+	args         func(gridValues *grid_to_isobands.GridValues) *grid_to_isobands.IsobandArgs
+}
+
+var endToEndCases = []endToEndCase{
+	mrmsBaseReflectivity,
+	mrmsBaseReflectivity2,
+	mrmsKnoxTornadoBaseReflectivity,
+	mrmsCompositeReflectivity,
+	mrmsMultiSensorQpe,
+	mrmsPrecipRate,
+	mrmsPrecipFlag,
+	mrmsCompositeReflectivity2,
+	gfsBaroPressure,
+	surfaceTemp,
+	visibilitySurface,
+	failedGfsHumidity100hpa,
+}
+
+// runEndToEnd loads a case's grid fresh (Preprocesses change it in place) and
+// contours it with the given backend.
+func runEndToEnd(t *testing.T, c endToEndCase, backend grid_to_isobands.Backend) *grid_to_isobands.ReturnValues {
+	t.Helper()
+	testData, err := getTestData(c.data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := c.args(&grid_to_isobands.GridValues{
+		SizeX:  testData.SizeX,
+		SizeY:  testData.SizeY,
+		Lats:   testData.Lats,
+		Lons:   testData.Lngs,
+		Values: testData.Values,
+	})
+	args.Backend = backend
+	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+// saveEndToEnd runs a case with the default backend, saves the output for
+// visual inspection and checks it with s2check.
+func saveEndToEnd(t *testing.T, c endToEndCase) {
+	t.Helper()
+	if err := saveTestOutput(runEndToEnd(t, c, grid_to_isobands.BackendPython), c.output); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestBackendsAgree runs every real-data case through both backends: the Go
+// output must pass s2check and cover the same area at each level as the
+// Python output.
+func TestBackendsAgree(t *testing.T) {
+	for _, c := range endToEndCases {
+		name := strings.TrimSuffix(c.output, `.geojson`)
+		t.Run(name, func(t *testing.T) {
+			start := time.Now()
+			py := runEndToEnd(t, c, grid_to_isobands.BackendPython).Isobands
+			pyTime := time.Since(start)
+			start = time.Now()
+			result := runEndToEnd(t, c, grid_to_isobands.BackendGo)
+			goTime := time.Since(start)
+			if err := saveTestOutput(result, name+`-go.geojson`); err != nil {
+				t.Error(err)
+			}
+			t.Logf(`python %v, %d features; go %v, %d features`, pyTime.Round(time.Millisecond), len(py.Features), goTime.Round(time.Millisecond), len(result.Isobands.Features))
+
+			pyAreas, goAreas := levelAreas(py), levelAreas(result.Isobands)
+			levels := slices.Sorted(maps.Keys(pyAreas))
+			for level := range goAreas {
+				if _, ok := pyAreas[level]; !ok {
+					levels = append(levels, level)
+				}
+			}
+			for _, level := range levels {
+				if diff := goAreas[level] - pyAreas[level]; math.Abs(diff) > areaTolerance(pyAreas[level]) {
+					t.Errorf(`level %d: go covers %v, python %v (difference %.3g)`, level, goAreas[level], pyAreas[level], diff)
+				}
+			}
+		})
+	}
+}
+
+// areaTolerance allows for the Python backend's set_precision, which snaps
+// every vertex to a 1e-9 degree grid, and its filter dropping rings under
+// 1e-9 square degrees, which the Go backend keeps. On the test data the
+// backends agree to within about 1e-9 of each level's area.
+func areaTolerance(area float64) float64 {
+	return 1e-6 + 1e-8*math.Abs(area)
+}
+
+// levelAreas sums the planar area (square degrees) of each level's features.
+func levelAreas(fc *grid_to_isobands.FeatureCollection) map[int]float64 {
+	areas := make(map[int]float64)
+	for _, feature := range fc.Features {
+		level := int(feature.Properties[`levelIndex`].(float64))
+		for _, ring := range feature.Geometry.Coordinates {
+			areas[level] += signedArea(ring)
+		}
+	}
+	return areas
+}
+
 func getTestData(filename string) (TestData, error) {
 	var testData TestData
 	f, err := os.Open(filepath.Join(`./.test_files`, filename))
@@ -651,6 +620,10 @@ func validateS2(fc *grid_to_isobands.FeatureCollection) error {
 }
 
 func TestSelectionsOnlyAffectIsobands(t *testing.T) {
+	forEachBackend(t, testSelectionsOnlyAffectIsobands)
+}
+
+func testSelectionsOnlyAffectIsobands(t *testing.T, backend grid_to_isobands.Backend) {
 	const size = 20
 	values := make([]float64, 0, size*size)
 	lats := make([]float64, 0, size*size)
@@ -672,6 +645,7 @@ func TestSelectionsOnlyAffectIsobands(t *testing.T) {
 		Floor: 0,
 		Step:  150,
 	}
+	args.Backend = backend
 	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
@@ -691,9 +665,13 @@ func TestSelectionsOnlyAffectIsobands(t *testing.T) {
 }
 
 func TestLargeBandsSplitAtPrimeMeridian(t *testing.T) {
+	forEachBackend(t, testLargeBandsSplitAtPrimeMeridian)
+}
+
+func testLargeBandsSplitAtPrimeMeridian(t *testing.T, backend grid_to_isobands.Backend) {
 	// Everything between 80S and 80N in one band, which S2 would read as its
 	// complement if it were emitted as one polygon.
-	result := globalBands(t, func(lat float64) float64 { return 1 })
+	result := globalBands(t, backend, func(lat float64) float64 { return 1 })
 
 	if len(result.Isobands.Features) != 2 {
 		t.Fatalf(`expected the band to be split into 2 features, got %d`, len(result.Isobands.Features))
@@ -710,9 +688,13 @@ func TestLargeBandsSplitAtPrimeMeridian(t *testing.T) {
 }
 
 func TestThinGlobalBandsStayWhole(t *testing.T) {
+	forEachBackend(t, testThinGlobalBandsStayWhole)
+}
+
+func testThinGlobalBandsStayWhole(t *testing.T, backend grid_to_isobands.Backend) {
 	// A band from 40N to 50N circles the globe but covers only a few percent of
 	// it, so it is already read correctly and shouldn't be split.
-	result := globalBands(t, func(lat float64) float64 {
+	result := globalBands(t, backend, func(lat float64) float64 {
 		if lat >= 40 && lat <= 50 {
 			return 1
 		}
@@ -729,7 +711,7 @@ func TestThinGlobalBandsStayWhole(t *testing.T) {
 
 // globalBands contours a 1-degree grid from 80S to 80N with values set by
 // latitude, as a single band between levels 0 and 2.
-func globalBands(t *testing.T, valueAt func(lat float64) float64) *grid_to_isobands.ReturnValues {
+func globalBands(t *testing.T, backend grid_to_isobands.Backend, valueAt func(lat float64) float64) *grid_to_isobands.ReturnValues {
 	t.Helper()
 	const sizeX, sizeY = 360, 161
 	values := make([]float64, 0, sizeX*sizeY)
@@ -748,6 +730,7 @@ func globalBands(t *testing.T, valueAt func(lat float64) float64) *grid_to_isoba
 		Grid:   &grid_to_isobands.GridValues{SizeX: sizeX, SizeY: sizeY, Values: values, Lats: lats, Lons: lons},
 		Levels: []float64{0, 2},
 	}
+	args.Backend = backend
 	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
@@ -756,6 +739,10 @@ func globalBands(t *testing.T, valueAt func(lat float64) float64) *grid_to_isoba
 }
 
 func TestBandsPartitionTheGrid(t *testing.T) {
+	forEachBackend(t, testBandsPartitionTheGrid)
+}
+
+func testBandsPartitionTheGrid(t *testing.T, backend grid_to_isobands.Backend) {
 	// A patch of the MRMS QPE test data where a band-0 polygon's shell
 	// touches itself around a hole of band-1 values. Repairing the polygon as
 	// a whole dropped the hole, so band 0 also covered it and overlapped band 1.
@@ -783,6 +770,7 @@ func TestBandsPartitionTheGrid(t *testing.T) {
 		Grid:   &grid_to_isobands.GridValues{SizeX: sizeX, SizeY: sizeY, Values: values, Lats: lats, Lons: lons},
 		Levels: []float64{0.25, 1, 2.5},
 	}
+	args.Backend = backend
 	result, err := grid_to_isobands.IsobandsFromGrid(context.Background(), args)
 	if err != nil {
 		t.Fatal(err)
@@ -811,4 +799,11 @@ func signedArea(ring orb.Ring) float64 {
 		area += ring[i][0]*ring[i+1][1] - ring[i+1][0]*ring[i][1]
 	}
 	return area / 2
+}
+
+// forEachBackend runs a test against each backend as a subtest.
+func forEachBackend(t *testing.T, test func(t *testing.T, backend grid_to_isobands.Backend)) {
+	for name, backend := range map[string]grid_to_isobands.Backend{`python`: grid_to_isobands.BackendPython, `go`: grid_to_isobands.BackendGo} {
+		t.Run(name, func(t *testing.T) { test(t, backend) })
+	}
 }

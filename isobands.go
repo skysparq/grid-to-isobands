@@ -15,6 +15,8 @@ import (
 
 	"github.com/fxamacker/cbor"
 	"github.com/google/uuid"
+	"github.com/skysparq/grid-to-isobands/contour"
+	"github.com/skysparq/grid-to-isobands/meridian"
 )
 
 //go:embed isobands.py
@@ -43,8 +45,22 @@ type IsobandArgs struct {
 	// Floor and Step.
 	Levels    []float64
 	AddlProps map[string]any
-	WorkDir   string
+	// WorkDir holds the Python backend's temporary files.
+	WorkDir string
+	// Backend chooses how isobands are contoured. The default is BackendPython.
+	Backend Backend
 }
+
+// Backend is how isobands are contoured.
+type Backend int
+
+const (
+	// BackendPython pipes the grid to isobands.py (contourpy and shapely).
+	BackendPython Backend = iota
+	// BackendGo contours in Go with the contour and meridian packages, with no
+	// Python, temporary files or repair step.
+	BackendGo
+)
 
 // pyArgs is the wire format sent to the Python isoband-generation subprocess.
 // Values, Lats, and Lons are packed as raw little-endian float64 bytes (see
@@ -147,6 +163,59 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 		levels = GenerateLevels(args.Floor, maxVal, args.Step)
 	}
 
+	var isobands *FeatureCollection
+	var err error
+	switch args.Backend {
+	case BackendPython:
+		isobands, err = pythonIsobands(ctx, args, grid, levels)
+	case BackendGo:
+		isobands, err = goIsobands(ctx, grid, levels)
+	default:
+		err = fmt.Errorf("unknown backend %d", args.Backend)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error generating isobands: %w", err)
+	}
+	isobands.Features = slices.DeleteFunc(isobands.Features, func(f Feature) bool { return f.Geometry.Coordinates == nil })
+	isobands.Properties = args.AddlProps
+	return isobands, nil
+}
+
+// goIsobands contours the grid in Go, splitting any polygon too large for S2
+// engines at the prime meridian, as isobands.py does.
+func goIsobands(ctx context.Context, grid *GridValues, levels []float64) (*FeatureCollection, error) {
+	topo, err := contour.Contour(&contour.Grid{NX: grid.SizeX, NY: grid.SizeY, X: grid.Lons, Y: grid.Lats, Z: grid.Values}, levels)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+	isobands := &FeatureCollection{Type: "FeatureCollection", Features: []Feature{}}
+	for k, band := range topo.Bands {
+		for _, polygon := range band.Polygons {
+			pieces, err := meridian.SplitIfOversized(topo.PolygonCoords(polygon))
+			if err != nil {
+				return nil, fmt.Errorf("level %d: %w", k, err)
+			}
+			for _, piece := range pieces {
+				isobands.AddPolygon(piece, map[string]any{
+					// levelIndex is a float64 as it is when decoded from the
+					// Python backend's JSON, so either backend's properties
+					// assert the same way.
+					"levelIndex": float64(k),
+					"floor":      band.Lower,
+					"ceiling":    band.Upper,
+					"nominal":    band.Lower + (band.Upper-band.Lower)/2,
+				})
+			}
+		}
+	}
+	return isobands, nil
+}
+
+// pythonIsobands contours the grid with isobands.py.
+func pythonIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues, levels []float64) (*FeatureCollection, error) {
 	jobId := uuid.NewString()
 	pyData := &pyArgs{
 		SizeX:  grid.SizeX,
@@ -160,14 +229,14 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	inPath := gridPath(jobId, args.WorkDir)
 	in, err := os.Create(inPath)
 	if err != nil {
-		return nil, fmt.Errorf("error generating isobands: failed to create input file: %w", err)
+		return nil, fmt.Errorf("failed to create input file: %w", err)
 	}
 	encoder := cbor.NewEncoder(in, cbor.EncOptions{})
 	err = encoder.Encode(pyData)
 	_ = in.Close()
 	defer func() { _ = os.Remove(inPath) }()
 	if err != nil {
-		return nil, fmt.Errorf("error generating isobands: failed to encode input file: %w", err)
+		return nil, fmt.Errorf("failed to encode input file: %w", err)
 	}
 
 	outPath := isobandPath(jobId, args.WorkDir)
@@ -175,12 +244,12 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	err = execCmd(ctx, `python3`, inPath, outPath)
 	defer func() { _ = os.Remove(outPath) }()
 	if err != nil {
-		return nil, fmt.Errorf("error generating isobands: %w", err)
+		return nil, err
 	}
 
 	banded, err := os.Open(outPath)
 	if err != nil {
-		return nil, fmt.Errorf("error generating isobands: failed to open isobands: %w", err)
+		return nil, fmt.Errorf("failed to open isobands: %w", err)
 	}
 	defer func() { _ = banded.Close() }()
 
@@ -188,10 +257,8 @@ func toIsobands(ctx context.Context, args *IsobandArgs, grid *GridValues) (*Feat
 	isobands := &FeatureCollection{}
 	err = decoder.Decode(isobands)
 	if err != nil {
-		return nil, fmt.Errorf("error generating isobands: failed to decode isobands: %w", err)
+		return nil, fmt.Errorf("failed to decode isobands: %w", err)
 	}
-	isobands.Features = slices.DeleteFunc(isobands.Features, func(f Feature) bool { return f.Geometry.Coordinates == nil })
-	isobands.Properties = args.AddlProps
 	return isobands, nil
 }
 
