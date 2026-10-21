@@ -39,6 +39,52 @@ func TestTopologyInvariants(t *testing.T) {
 	}
 }
 
+// TestTinyRingsFarFromOrigin contours a node just outside the snap tolerance
+// of a level, far from index (0, 0) as in a CONUS grid, which makes a ring
+// around it about 1e-7 across. Its shoelace terms are around 1e6, so with
+// absolute coordinates their rounding error exceeds its area and can flip it
+// between shell and hole ("hole ... is inside no shell" in RTMA temperature).
+func TestTinyRingsFarFromOrigin(t *testing.T) {
+	const nx, ny, i0, j0 = 1470, 440, 1467, 438
+	rng := rand.New(rand.NewPCG(1, 2))
+	g := &Grid{NX: nx, NY: ny, X: make([]float64, nx*ny), Y: make([]float64, nx*ny), Z: make([]float64, nx*ny)}
+	for j := range ny {
+		for i := range nx {
+			n := j*nx + i
+			g.X[n], g.Y[n] = -130+0.025*float64(i), 55-0.025*float64(j)
+		}
+	}
+	for trial := range 40 {
+		for n := range g.Z {
+			g.Z[n] = 0.5
+		}
+		// A peak just above level 1 among lower values, or a pit just below
+		// it among higher ones.
+		eps := 1e-8 * float64(1+rng.IntN(50))
+		peak := trial%2 == 0
+		for dj := -1; dj <= 1; dj++ {
+			for di := -1; di <= 1; di++ {
+				n := (j0+dj)*nx + i0 + di
+				switch {
+				case di == 0 && dj == 0 && peak:
+					g.Z[n] = 1 + eps
+				case di == 0 && dj == 0:
+					g.Z[n] = 1 - eps
+				case peak:
+					g.Z[n] = 0.99 * rng.Float64()
+				default:
+					g.Z[n] = 1.01 + rng.Float64()
+				}
+			}
+		}
+		topo, err := Contour(g, []float64{0, 1, 2, 3})
+		if err != nil {
+			t.Fatalf(`trial %d: %v`, trial, err)
+		}
+		checkPolygonsValid(t, topo)
+	}
+}
+
 type valueKind int
 
 const (

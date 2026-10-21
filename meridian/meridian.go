@@ -257,11 +257,15 @@ func assemble(rings []orb.Ring) ([]orb.Polygon, error) {
 	return polygons, nil
 }
 
-// area is a ring's planar signed area, positive for counterclockwise.
+// area is a ring's planar signed area, positive for counterclockwise. It is
+// computed relative to the first point, since with absolute coordinates the
+// rounding error can exceed a tiny ring's area and flip its sign.
 func area(ring orb.Ring) float64 {
 	var a float64
+	o := ring[0]
 	for i := 0; i+1 < len(ring); i++ {
-		a += ring[i][0]*ring[i+1][1] - ring[i+1][0]*ring[i][1]
+		p, q := ring[i], ring[i+1]
+		a += (p[0]-o[0])*(q[1]-o[1]) - (q[0]-o[0])*(p[1]-o[1])
 	}
 	return a / 2
 }

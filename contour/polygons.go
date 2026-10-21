@@ -37,9 +37,15 @@ func (t *Topology) ringShape(r Ring) ringShape {
 		}
 	}
 	points = append(points, points[0])
+	// Relative to the first point: rings around a node whose value is just
+	// outside the snap tolerance of a level can be 1e-7 across, and with
+	// absolute index coordinates (up to thousands) the shoelace terms' rounding
+	// error swamps their area and can flip its sign.
 	var area float64
+	o := points[0]
 	for k := 0; k+1 < len(points); k++ {
-		area += points[k][0]*points[k+1][1] - points[k+1][0]*points[k][1]
+		a, b := points[k], points[k+1]
+		area += (a[0]-o[0])*(b[1]-o[1]) - (b[0]-o[0])*(a[1]-o[1])
 	}
 	return ringShape{points: points, area: area / 2, bound: points.Bound()}
 }
